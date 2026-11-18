@@ -1,0 +1,32 @@
+/* Print style of the Obtura user guide (docs/make-guide.sh). */
+@page {
+  size: A4;
+  margin: 20mm 19mm 20mm 19mm;
+  @bottom-center { content: counter(page); font: 9pt "Ubuntu Sans", sans-serif; color: #777; }
+}
+@page :first { @bottom-center { content: none; } }
+html { font-family: "Ubuntu Sans", "Noto Sans", sans-serif; font-size: 10.5pt; line-height: 1.5; color: #1f2328; }
+body { margin: 0; }
+h1, h2, h3 { font-family: "Ubuntu Sans", sans-serif; color: #2b3f7a; line-height: 1.25; break-after: avoid; }
+h1 { font-size: 30pt; margin: 0 0 4pt 0; }
+h2 { font-size: 17pt; margin: 22pt 0 8pt 0; padding-bottom: 3pt; border-bottom: 2px solid #4e6fb8; break-before: page; }
+h3 { font-size: 12.5pt; margin: 16pt 0 5pt 0; }
+p, li { orphans: 3; widows: 3; }
+a { color: #1f5fa8; text-decoration: none; }
+code { font-family: "Ubuntu Sans Mono", "DejaVu Sans Mono", monospace; font-size: 9.5pt; background: #f2f4f7; padding: 1px 4px; border-radius: 3px; }
+pre { background: #f2f4f7; border-left: 3px solid #2b3f7a; padding: 7pt 10pt; border-radius: 4px; white-space: pre-wrap; break-inside: avoid; }
+pre code { background: none; padding: 0; }
+img { display: block; max-width: 100%; max-height: 105mm; width: auto; height: auto; margin: 8pt auto 12pt auto; border: 1px solid #d0d7de; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); break-inside: avoid; }
+table { border-collapse: collapse; width: 100%; margin: 6pt 0 12pt 0; font-size: 9.8pt; break-inside: auto; }
+th { background: #eef3f9; text-align: left; }
+th, td { border: 1px solid #d0d7de; padding: 4pt 7pt; vertical-align: top; }
+tr { break-inside: avoid; }
+blockquote { margin: 8pt 0; padding: 6pt 10pt; background: #eef2fa; border-left: 3px solid #4e6fb8; color: #4a4a4a; }
+hr { display: none; }
+/* The cover: the title, the version line, the logo and the first picture. */
+.cover { text-align: left; padding-top: 6mm; }
+.cover img.logo { width: 24mm; border: none; box-shadow: none; margin: 0 0 6mm 0; }
+.cover .title { font-size: 34pt; font-weight: bold; color: #2b3f7a; line-height: 1.2; margin-bottom: 4pt; }
+.cover .version { font-size: 13pt; color: #57606a; margin-bottom: 8mm; }
+/* The first section after the cover starts on its own page. */
+h2#contents { break-before: page; }

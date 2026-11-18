@@ -1,0 +1,10 @@
+/target
+/spike/target
+/spike/out
+/dist
+# Working files kept on the developer's computer only (not published).
+/CLAUDE.md
+/OBTURA_PROJECT_NOTES.md
+/docs/QC-CHECKLIST.md
+/spike/
+/.claude/

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="16"
+   height="16"
+   viewBox="0 0 16 16"
+   version="1.1"
+   id="svg2"
+   sodipodi:docname="com.grasshillsco.Obtura-symbolic.svg"
+   inkscape:version="1.4.3 (0d15f75042, 2025-12-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs2" />
+  <sodipodi:namedview
+     id="namedview2"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="4.6127669"
+     inkscape:cx="20.161435"
+     inkscape:cy="-13.332562"
+     inkscape:window-width="1873"
+     inkscape:window-height="1043"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <!-- Obtura, symbolic: a selection (three corners) with the pointer dragging the fourth.
+       Fills only, so GTK can recolour it. -->
+  <path
+     fill="#2e3436"
+     d="M1 5.5V3a2 2 0 0 1 2-2h2.5v1.5H3a.5.5 0 0 0-.5.5v2.5zM15 5.5V3a2 2 0 0 0-2-2h-2.5v1.5H13a.5.5 0 0 1 .5.5v2.5zM1 10.5V13a2 2 0 0 0 2 2h2.5v-1.5H3a.5.5 0 0 1-.5-.5v-2.5z"
+     id="path1" />
+  <path
+     fill="#2e3436"
+     d="M 10.5,1 H 13 a 2,2 0 0 1 2,2 V 5.5 H 13.5 V 3 A 0.5,0.5 0 0 0 13,2.5 h -2.5 z m 0,14 H 13 a 2,2 0 0 0 2,-2 V 10.5 H 13.5 V 13 A 0.5,0.5 0 0 1 13,13.5 H 10.5 Z M 5.5,1 H 3 A 2,2 0 0 0 1,3 V 5.5 H 2.5 V 3 A 0.5,0.5 0 0 1 3,2.5 h 2.5 z"
+     id="path1-6" />
+  <text
+     xml:space="preserve"
+     style="font-size:16.703px;line-height:0;font-family:Akaash;-inkscape-font-specification:Akaash;writing-mode:lr-tb;direction:ltr;fill:#ffb340;stroke:#000000;stroke-width:1.13163;stroke-linecap:round;stroke-opacity:0.125595"
+     x="2.5863392"
+     y="12.566024"
+     id="text2"
+     transform="scale(0.9666172,1.0345357)"><tspan
+       sodipodi:role="line"
+       id="tspan2"
+       x="2.5863392"
+       y="12.566024"
+       style="font-size:16.703px;fill:#000000;stroke-width:1.13163">o</tspan></text>
+</svg>

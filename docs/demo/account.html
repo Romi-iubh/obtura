@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<!-- The made-up page the guide's screenshots are taken of (docs/make-screenshots.sh).
+     Every name, number and address in it is fictional or reserved for examples. -->
+<html lang="en"><head><meta charset="utf-8"><style>
+  html, body { margin: 0; width: 800px; height: 500px; overflow: hidden; }
+  body { font: 15px/1.4 "Cantarell", "DejaVu Sans", sans-serif; color: #24292f; background: #f6f7f9; }
+  header { height: 52px; background: #2f6f4f; color: white; display: flex; align-items: center; padding: 0 24px; gap: 24px; }
+  header b { font-size: 18px; letter-spacing: .3px; }
+  header span { opacity: .85; font-size: 14px; }
+  main { padding: 18px 28px; }
+  h1 { font-size: 22px; margin: 0 0 12px; font-weight: 600; }
+  .card { background: white; border: 1px solid #d8dee4; border-radius: 10px; padding: 6px 20px; }
+  .row { display: flex; padding: 9px 0; border-bottom: 1px solid #eef1f4; }
+  .row:last-child { border-bottom: none; }
+  .k { width: 170px; color: #57606a; }
+  .v { font-weight: 500; }
+  .mono { font-family: "DejaVu Sans Mono", monospace; font-size: 14px; }
+  .buttons { margin-top: 16px; display: flex; gap: 12px; }
+  .btn { padding: 8px 18px; border-radius: 8px; border: 1px solid #c9d1d9; background: white; }
+  .btn.primary { background: #2f6f4f; color: white; border-color: #2f6f4f; }
+</style></head><body>
+<header><b>Northwind Garden Club</b><span>Events</span><span>Allotments</span><span>Seed swap</span><span>My account</span></header>
+<main>
+  <h1>Member account</h1>
+  <div class="card">
+    <div class="row"><div class="k">Name</div><div class="v">Maria Lopez</div></div>
+    <div class="row"><div class="k">Email</div><div class="v">maria.lopez@example.com</div></div>
+    <div class="row"><div class="k">Phone</div><div class="v">+44 20 7946 0958</div></div>
+    <div class="row"><div class="k">Card on file</div><div class="v mono">4111 1111 1111 1111</div></div>
+    <div class="row"><div class="k">Last sign-in from</div><div class="v mono">192.0.2.44</div></div>
+    <div class="row"><div class="k">Plot number</div><div class="v">14B, north field</div></div>
+  </div>
+  <div class="buttons"><div class="btn primary">Save changes</div><div class="btn">Cancel</div></div>
+</main>
+</body></html>

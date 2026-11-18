@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 Rosaire -->
+<component type="desktop-application">
+  <id>com.grasshillsco.Obtura</id>
+  <name>Obtura</name>
+  <summary>Capture, annotate, redact and record your screen</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-or-later</project_license>
+  <developer id="com.grasshillsco">
+    <name>Rosaire</name>
+  </developer>
+  <icon type="stock">com.grasshillsco.Obtura</icon>
+  <launchable type="desktop-id">com.grasshillsco.Obtura.desktop</launchable>
+  <url type="homepage">https://github.com/Romi-iubh/obtura</url>
+  <url type="bugtracker">https://github.com/Romi-iubh/obtura/issues</url>
+  <url type="help">https://github.com/Romi-iubh/obtura/blob/main/docs/user-guide.md</url>
+  <url type="vcs-browser">https://github.com/Romi-iubh/obtura</url>
+  <categories>
+    <category>Graphics</category>
+  </categories>
+  <keywords>
+    <keyword>screenshot</keyword>
+    <keyword>screen capture</keyword>
+    <keyword>screen recording</keyword>
+    <keyword>GIF</keyword>
+    <keyword>annotate</keyword>
+    <keyword>redact</keyword>
+    <keyword>blur</keyword>
+    <keyword>OCR</keyword>
+    <keyword>colour picker</keyword>
+    <keyword>scrolling screenshot</keyword>
+    <keyword>QR code</keyword>
+  </keywords>
+  <description>
+    <p>Obtura is a screenshot and screen recording tool for the GNOME desktop, with an
+    editor that needs no manual. Everything happens on your computer: Obtura never
+    connects to the internet.</p>
+    <ul>
+      <li>Capture a region or the whole screen, the same region again, after a delay, or a
+      whole page that scrolls; the picture is on the clipboard at once</li>
+      <li>Annotate: arrows, curves through several points, shapes, pen, highlighter, text
+      and callouts typed on the picture in any installed font, numbered steps, emoji and
+      symbols, magnifier, spotlight, measure. Every mark stays editable, and can be turned,
+      until you save</li>
+      <li>Redact for real: blur, pixelate or cover with a box; the hidden pixels are gone
+      from the saved file. Smart Redact finds email addresses, phone and card numbers,
+      IBANs, IP addresses, keys and QR codes for you</li>
+      <li>Beautify: background colours or a picture of your own, padding, rounded corners,
+      shadow, window bar, phone, tablet, laptop and monitor frames</li>
+      <li>Edit the picture: crop, rotate, resize, add space, cut out a strip, combine
+      several pictures</li>
+      <li>Copy the text of a picture or of any part of the screen, read QR codes, pick a
+      colour, measure the screen, pin a picture on the screen</li>
+      <li>Record the screen, an area, a window or all your screens as MP4, WebM or GIF,
+      with microphone and computer sound (with level meters); pause, resume and stop from
+      Obtura's icon in the top bar; trim afterwards</li>
+      <li>A library of every capture, searchable by the text in it and by your own tags</li>
+      <li>A command line for scripts and keyboard shortcuts</li>
+    </ul>
+  </description>
+  <screenshots>
+    <screenshot type="default">
+      <caption>The editor: arrows, text, numbered steps and a blurred email address</caption>
+      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.0/docs/screenshots/editor.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Beautify: background, shadow and window bar in one click</caption>
+      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.0/docs/screenshots/beautify.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Smart Redact finds what should not be shared</caption>
+      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.0/docs/screenshots/smart-redact.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Recording the screen as MP4, WebM or GIF</caption>
+      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.0/docs/screenshots/record.png</image>
+    </screenshot>
+  </screenshots>
+  <provides>
+    <binary>obtura</binary>
+  </provides>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.9.0" date="2026-11-18">
+      <description>
+        <p>The first package of Obtura, for Ubuntu 24.04 LTS and newer: the release
+        candidate for 1.0.</p>
+        <ul>
+          <li>Screenshots of a region or the whole screen, without GNOME's flash, straight
+          to the clipboard and into the editor; after a delay counted down in the top bar;
+          the editor's New takes the same kind of capture again, as chosen beside it</li>
+          <li>Scrolling capture: a whole page that scrolls in one picture</li>
+          <li>An editor whose marks stay editable and can be turned: lines and arrows, curves
+          through several points, shapes, pen, highlighter, text in any installed font
+          (paste text with Ctrl+V), callouts, numbered steps, emoji, spotlight, magnifier,
+          blur, pixelate, box, crop, cut out, copy text, colour picker, measure</li>
+          <li>Smart Redact (QR codes too), Beautify (a picture as background, device
+          frames), the Image menu (rotate, resize, add space, combine several pictures)</li>
+          <li>Read QR codes in a picture or on the screen; measure on the screen; colours
+          copied as hex, rgb() or hsl()</li>
+          <li>Screen recording of an area, a screen, a window or all screens to MP4, WebM
+          and GIF with sound and level meters, pause and resume from the top bar, and
+          trimming</li>
+          <li>The library of every capture, searchable by its text and by tags (accents do
+          not matter); pin to screen</li>
+          <li>Keys that work in every app: Super+Shift+S for a region, Super+Shift+T for
+          text, Super+Shift+R to record</li>
+          <li>Help › User Guide (F1), a manual page (man obtura), and the licences of the
+          software Obtura contains in the About window</li>
+          <li>A log file of errors and crashes, on your computer only (Show Log File)</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>

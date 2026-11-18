@@ -1,0 +1,169 @@
+.TH OBTURA 1 "November 2026" "Obtura 0.9.0" "User Commands"
+.SH NAME
+obtura \- take, annotate and redact screenshots, and record the screen
+.SH SYNOPSIS
+.B obtura
+[\fIOPTION\fR...]
+.SH DESCRIPTION
+.B Obtura
+is a screenshot and screen recording tool for the GNOME desktop. Without an option it
+opens its start window. With an option it starts a capture at once, which makes it easy to
+bind to a key: when Obtura is already running, the options go to the running Obtura, so
+the capture starts without delay.
+.PP
+After a capture the picture is on the clipboard and Obtura's editor opens: arrows, curves
+through several bends, shapes, pen, highlighter, text and callouts, numbered steps, emoji
+and symbols, magnifier, spotlight, measure, blur, pixelate, box, Smart Redact (text and QR
+codes), crop, cut out, Beautify (backgrounds, pictures, devices), rotate, resize and
+combine. Every mark stays editable (and can be turned) until the picture is saved. Blur,
+pixelate and box destroy the hidden pixels in the saved file.
+.PP
+The user guide opens with \fBF1\fR in any Obtura window.
+.SH OPTIONS
+.SS Capture
+.TP
+.B \-\-region
+Select a part of the screen, then open it in the editor.
+.TP
+.B \-\-screen
+Capture the whole screen.
+.TP
+.B \-\-last\-region
+Capture the region chosen last time, without asking (asks when there is none).
+.TP
+.B \-\-window
+Capture a window: GNOME lists the open windows and asks which one (with
+\fB\-\-record\fR: record that window).
+.TP
+.B \-\-scroll
+Scrolling capture: select the part of the screen that scrolls, press Enter, then scroll
+it slowly with the mouse wheel; Obtura joins what comes into view. Run
+\fBobtura \-\-scroll\fR again (or use Obtura's icon in the top bar, or open Obtura) to
+finish. Goes with \fB\-\-copy\fR, \fB\-\-save\fR, \fB\-\-ocr\fR, \fB\-\-qr\fR and
+\fB\-\-pin\fR like \fB\-\-region\fR.
+.TP
+.BI \-\-delay " N"
+Wait \fIN\fR seconds (0 to 30) before capturing; the seconds left show beside Obtura's
+icon in the top bar.
+.TP
+.B \-\-copy
+Copy the picture to the clipboard without opening the editor. Obtura then keeps running
+in the background, which keeps the clipboard; in a script, start it with \fB&\fR.
+.TP
+.BR \-\-save " [\fIPATH\fR]"
+Save the picture as a PNG file without opening the editor. Without \fIPATH\fR it goes to
+the save folder (Preferences), named by the file name template. Obtura exits when done.
+.TP
+.B \-\-ocr
+Read the text in the picture, copy it to the clipboard and print it. A region unless
+\fB\-\-screen\fR or \fB\-\-last\-region\fR is given. Needs \fBtesseract\fR.
+.TP
+.B \-\-qr
+Read the QR codes in the picture, copy what they hold to the clipboard and print it, one
+code per line. A region unless \fB\-\-screen\fR or \fB\-\-last\-region\fR is given.
+.TP
+.B \-\-pin
+Pin the picture on the screen in a small window of its own.
+.TP
+.BR \-\-pick\-color ", " \-\-pick\-colour
+Click anywhere on the screen: the colour is copied and printed as \fB#rrggbb\fR (or as
+\fBrgb()\fR or \fBhsl()\fR, as set in Preferences).
+.TP
+.B \-\-measure
+Measure on the screen: drag across something; Enter copies and prints the measurement
+(width \(mu height, length and angle, in pixels).
+.SS Record
+.TP
+.B \-\-record
+Record an area of the screen (with \fB\-\-screen\fR: a whole screen; with
+\fB\-\-window\fR: a window picked in GNOME's list; with \fB\-\-all\-screens\fR: every
+shared screen side by side in one video) as set in the Record window: format (MP4, WebM or
+GIF), sound, pointer and countdown. Run
+\fBobtura \-\-record\fR again to stop; the first command then prints the file saved.
+While recording, Obtura's icon in the top bar pauses, resumes and stops.
+.SS Other
+.TP
+.B \-\-library
+Open the library of past screenshots.
+.TP
+.BR \-h ", " \-\-help
+Print the options and exit.
+.TP
+.B \-\-version
+Print the version and exit.
+.SH EXIT STATUS
+.TP
+.B 0
+Done.
+.TP
+.B 1
+Failed (or, with \fB\-\-ocr\fR or \fB\-\-qr\fR, nothing found).
+.TP
+.B 2
+Wrong options.
+.TP
+.B 3
+Cancelled (Escape in the region overlay, or the screen sharing was refused).
+.SH EXAMPLES
+.TP
+.B obtura \-\-region
+The usual keyboard shortcut: choose a region, then annotate it.
+.TP
+.B obtura \-\-screen \-\-delay 5 \-\-save ~/Pictures/menu.png
+Five seconds to open a menu, then the whole screen saved to a file.
+.TP
+.B obtura \-\-ocr
+Copy the text of a part of the screen, for example of a picture or a video.
+.TP
+.B obtura \-\-scroll \-\-save ~/Pictures/page.png
+A whole web page in one picture: select it, scroll it, then run \fBobtura \-\-scroll\fR
+again.
+.SH KEYBOARD SHORTCUTS
+Obtura's own keys (Ctrl+Shift+R and the others) work while an Obtura window is in front.
+For keys that work in every app, turn on Preferences \(fc Keys in every app: Obtura adds
+Super+Shift+S (capture a region), Super+Shift+T (copy the text of a region) and
+Super+Shift+R (start or stop recording) to GNOME's custom shortcuts, unless something else
+uses the key. GNOME lets each user bind a key to any other command: Settings \(fc Keyboard
+\(fc View and Customize Shortcuts \(fc Custom Shortcuts. Obtura's Preferences list the
+commands, with a button to copy each one.
+.SH FILES
+.TP
+.I ~/.config/obtura/settings.json
+Preferences, tool styles, the Record window's choices.
+.TP
+.I ~/.local/share/obtura/library/
+The library: every capture as it was taken (before any blur), its text, its tags, and the
+marks of the last save. Preferences can turn it off or remove old captures.
+.TP
+.I ~/.local/share/obtura/backgrounds/
+Pictures chosen as a Beautify background (a copy each).
+.TP
+.I ~/.local/state/obtura/
+The last region chosen, the screens GNOME lets Obtura see (screen sharing), and
+.IR obtura.log ,
+the log of errors, warnings and crashes (about 1 MB at most; never pictures or their text; it stays on this computer).
+.TP
+.I ~/.cache/obtura/
+The parts of a recording or a scrolling capture under way; removed when it ends.
+.TP
+.I ~/Pictures/Screenshots/ \fRand\fP ~/Videos/Screencasts/
+Where pictures and recordings are saved unless Preferences say otherwise.
+.SH PROGRAMS USED WHEN PRESENT
+.TP
+.B gst\-launch\-1.0
+(package gstreamer1.0-tools, with gstreamer1.0-pipewire and the GStreamer plugins) for
+recording, joining paused parts and trimming.
+.TP
+.B tesseract
+(packages tesseract-ocr and tesseract-ocr-\fIlanguage\fR) for Copy Text, Smart Redact and
+the library search. QR codes are read by Obtura itself.
+.SH PRIVACY
+Obtura works entirely on this computer. It does not connect to the internet and sends no
+data anywhere.
+.SH BUGS
+Report problems at
+.UR https://github.com/Romi-iubh/obtura/issues
+.UE ,
+or from the main menu's Report a Problem.
+.SH SEE ALSO
+The user guide, \fI/usr/share/obtura/Obtura-User-Guide.pdf\fR.

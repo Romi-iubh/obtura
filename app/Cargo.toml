@@ -1,0 +1,70 @@
+[package]
+name = "obtura"
+description = "Screenshots, screen recording and annotation for GNOME"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme = "../README.md"
+
+[[bin]]
+name = "obtura"
+path = "src/main.rs"
+
+[dependencies]
+obtura-capture.workspace = true
+obtura-image.workspace = true
+obtura-core.workspace = true
+obtura-scene.workspace = true
+obtura-render.workspace = true
+gtk.workspace = true
+adw.workspace = true
+
+
+[package.metadata.deb]
+name = "obtura"
+maintainer = "Rosaire <123895137+Romi-iubh@users.noreply.github.com>"
+copyright = "2026, Rosaire"
+changelog = "../packaging/changelog"
+extended-description = """Obtura takes screenshots of a region or the whole screen, and records the \
+screen or an area as MP4, WebM or GIF, with microphone and computer sound. Its editor opens right \
+after the capture: arrows, lines, curves, shapes, pen, highlighter, text and callouts typed on the \
+picture, numbered steps, emoji and symbols, magnifier, spotlight, measure. Every mark stays editable \
+until the picture is saved. Blur, pixelate and box destroy the pixels in the saved file; Smart Redact \
+finds email addresses, phone and card numbers, IBANs, IP addresses and keys. It also copies the text \
+of a picture (OCR), picks colours, pins a picture on the screen, frames it (background, shadow, \
+window bar) and keeps a library of every capture, searchable by its text. \
+Everything happens on this computer: Obtura does not connect to the internet."""
+section = "graphics"
+priority = "optional"
+# librsvg2-common: GTK draws Obtura's SVG icons with it.
+depends = "$auto, librsvg2-common"
+# Programs Obtura runs when they are there (apt installs these with Obtura; everything
+# else works without them):
+# - GStreamer's tools and plugins: recording (pipewire: the screen; good: WebM, MP4
+#   container, sound, cropping, joining; ugly: H.264 for MP4; libav: AAC sound in MP4
+#   and reading MP4 to trim it; bad: cutting exactly to the frame when trimming)
+# - tesseract-ocr and its English data: Copy Text, Smart Redact, library search
+# - fonts-noto-color-emoji: the emoji of the Emoji and Symbols tool
+recommends = "gstreamer1.0-tools, gstreamer1.0-pipewire, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, gstreamer1.0-plugins-ugly, gstreamer1.0-plugins-bad, gstreamer1.0-libav, tesseract-ocr, tesseract-ocr-eng, fonts-noto-color-emoji"
+# Text reading in every language.
+suggests = "tesseract-ocr-all"
+assets = [
+    ["target/release/obtura", "usr/bin/", "755"],
+    ["../data/com.grasshillsco.Obtura.desktop", "usr/share/applications/", "644"],
+    # D-Bus activation: the app grid and the dock start Obtura through this.
+    ["../data/com.grasshillsco.Obtura.service", "usr/share/dbus-1/services/", "644"],
+    ["../data/com.grasshillsco.Obtura.metainfo.xml", "usr/share/metainfo/", "644"],
+    ["../data/icons/hicolor/scalable/apps/com.grasshillsco.Obtura.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
+    ["../data/icons/hicolor/symbolic/apps/com.grasshillsco.Obtura-symbolic.svg", "usr/share/icons/hicolor/symbolic/apps/", "644"],
+    ["../data/obtura.1", "usr/share/man/man1/", "644"],
+    # Help › User Guide (F1) opens this (app/src/help.rs). Not under /usr/share/doc,
+    # which minimal installs leave out.
+    ["../docs/Obtura-User-Guide.pdf", "usr/share/obtura/", "644"],
+    ["../packaging/copyright", "usr/share/doc/obtura/copyright", "644"],
+    ["../packaging/THIRD-PARTY-LICENSES.txt", "usr/share/doc/obtura/", "644"],
+    ["../README.md", "usr/share/doc/obtura/", "644"],
+]

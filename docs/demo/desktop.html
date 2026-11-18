@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<!-- A made-up desktop (1280x800) for the region overlay's screenshot: a top bar and a
+     window showing docs/demo/account.png. -->
+<html lang="en"><head><meta charset="utf-8"><style>
+  html, body { margin: 0; width: 1280px; height: 800px; overflow: hidden; }
+  body { font: 14px "Cantarell", "DejaVu Sans", sans-serif;
+         background: linear-gradient(135deg, #1c3d5a 0%, #3a6b8c 45%, #e3a46b 100%); }
+  .bar { height: 30px; background: #000; color: #fff; display: flex; align-items: center;
+         justify-content: center; font-weight: 600; position: relative; }
+  .bar .left { position: absolute; left: 14px; font-weight: 600; }
+  .bar .right { position: absolute; right: 14px; opacity: .9; }
+  .win { position: absolute; left: 210px; top: 110px; width: 860px; border-radius: 12px;
+         overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,.45); background: #fff; }
+  .title { height: 46px; background: #ebebed; display: flex; align-items: center; padding: 0 14px; gap: 10px; }
+  .addr { flex: 1; background: #fff; border-radius: 8px; height: 30px; display: flex; align-items: center;
+          padding: 0 12px; color: #555; }
+  .dots { display: flex; gap: 8px; }
+  .dots i { width: 13px; height: 13px; border-radius: 50%; background: #c0c0c4; display: block; }
+  .page { padding: 0 30px 20px; background: #f6f7f9; }
+  img { display: block; }
+</style></head><body>
+<div class="bar"><span class="left">Activities</span>Sun 15 Nov  10:42<span class="right">⏻</span></div>
+<div class="win">
+  <div class="title"><div class="addr">northwind-garden.example/account</div><div class="dots"><i></i><i></i><i></i></div></div>
+  <div class="page"><img src="account.png" width="800" height="500" alt=""></div>
+</div>
+</body></html>

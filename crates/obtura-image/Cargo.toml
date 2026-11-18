@@ -1,0 +1,14 @@
+[package]
+name = "obtura-image"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gif = "0.14.2"
+# QR codes (pure Rust, MIT/Apache + ISC). Without its `image` feature: pixels are handed over directly.
+rqrr = { version = "0.11", default-features = false }
+# PNG decode/encode only for now. JPEG and WebP are added with export.
+image = { version = "0.25", default-features = false, features = ["png"] }

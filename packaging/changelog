@@ -1,0 +1,27 @@
+obtura (0.9.0-1) noble; urgency=medium
+
+  * First package, for Ubuntu 24.04 LTS and every newer release: the release
+    candidate for 1.0.
+  * Screenshots of a region or the whole screen without GNOME's flash, on the
+    clipboard at once; the editor with lines, arrows, curves, shapes, pen,
+    highlighter, text, callouts, numbered steps, emoji, spotlight, magnifier,
+    blur, pixelate, box, crop, cut out, measure; Smart Redact, Beautify, the
+    Image menu.
+  * Scrolling capture of pages longer than the screen; delayed captures
+    counted down in the top bar.
+  * Marks can be turned, curves bend through several points, text can be
+    pasted, any installed font; Beautify with a picture background and device
+    frames; several pictures combined in a row, a column or a grid.
+  * Copy Text (OCR), QR codes (rqrr), colour picker (hex, rgb, hsl), measuring
+    on the screen, pin to screen, the library of captures with tags.
+  * Keys that work in every app (Super+Shift+S, Super+Shift+T, Super+Shift+R),
+    added to GNOME's keyboard shortcuts on request.
+  * Screen recording of an area, a screen, a window or all screens to MP4,
+    WebM and GIF with sound and level meters; pause, resume and stop from the
+    top bar; trimming.
+  * Help: user guide (F1), Report a Problem, About with What's New and the
+    licences of the software Obtura contains; obtura --version; man obtura.
+  * The dock icon's menu (Capture a Region, Capture the Screen, Copy Text from
+    the Screen, Library) runs Obtura's own actions.
+
+ -- Rosaire <123895137+Romi-iubh@users.noreply.github.com>  Wed, 18 Nov 2026 01:01:03 +0100

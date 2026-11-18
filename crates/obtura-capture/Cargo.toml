@@ -1,0 +1,13 @@
+[package]
+name = "obtura-capture"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+# GLib/GIO only (D-Bus for the portal): not GTK. Already in the lockfile through gtk4.
+gio = "0.21"
+# Frames of a scrolling capture, and the fake screen's test page (workspace crate, no GTK).
+obtura-image.workspace = true

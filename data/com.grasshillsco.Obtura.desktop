@@ -1,0 +1,32 @@
+[Desktop Entry]
+Type=Application
+Name=Obtura
+GenericName=Screenshot Tool
+Comment=Capture, annotate, redact and record your screen
+Exec=obtura
+Icon=com.grasshillsco.Obtura
+Terminal=false
+Categories=GNOME;GTK;Graphics;
+Keywords=screenshot;screen capture;screen recording;record;GIF;annotate;redact;blur;OCR;text;colour picker;color picker;
+StartupNotify=true
+DBusActivatable=true
+X-GNOME-UsesNotifications=true
+# With DBusActivatable, the desktop activates these by name (the app actions of the same
+# names, app/src/app.rs); Exec is what other desktops run.
+Actions=capture-region;capture-screen;capture-text;library;
+
+[Desktop Action capture-region]
+Name=Capture a Region
+Exec=obtura --region
+
+[Desktop Action capture-screen]
+Name=Capture the Screen
+Exec=obtura --screen
+
+[Desktop Action capture-text]
+Name=Copy Text from the Screen
+Exec=obtura --ocr
+
+[Desktop Action library]
+Name=Library
+Exec=obtura --library
