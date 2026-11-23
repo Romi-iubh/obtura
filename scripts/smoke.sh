@@ -32,8 +32,9 @@
 #           Codes (Ctrl+Shift+Q) on tests/fixtures/qr-one.png copies the link.
 #   cli: runs the command line: --save writes a PNG and exits 0; --copy puts the picture on
 #        the clipboard; a wrong option exits 2; an unwritable path exits 1; Escape in the
-#        region overlay exits 3; --window saves the fake window; --qr reads the two codes of
-#        tests/fixtures/qr-two.png.
+#        region overlay exits 3; --window saves the fake window; a window picked on the overlay
+#        (OBTURA_FAKE_WINDOWS, as on Windows) by a click, by Tab and Enter, Escape exits 3; with one
+#        screen Full Screen never asks; --qr reads the two codes of tests/fixtures/qr-two.png.
 # Screenshots go to /tmp/obtura-smoke/.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -171,6 +172,29 @@ xvfb-run -a -s "-screen 0 ${SCREEN}x24" dbus-run-session -- bash -c '
     # --window: the fake screen sharing gives a 480 x 320 test window (as if picked in the list of GNOME).
     timeout 30 "$BIN" --window --save "$SMOKE_OUT/window.png" >/dev/null 2>&1; check "--window --save exit status" 0 $?
     check "--window saved the window" "480x320" "$(identify -format "%wx%h" "$SMOKE_OUT/window.png" 2>/dev/null || echo none)"
+    # --window where the system lists the windows itself (Windows): the window is picked on the
+    # overlay. The one under the pointer is taken, with the pixels it has on the screen; Tab lights
+    # up the next one, Enter takes it; Escape cancels.
+    export OBTURA_FAKE_WINDOWS="100,80,300,200,Notes;0,0,${W},${H},Back"
+    "$BIN" --window --save "$SMOKE_OUT/picked.png" >/dev/null 2>&1 &
+    CLI=$!
+    sleep 3; xdotool mousemove 250 180; sleep 0.5; shot window-picker; xdotool click 1; wait $CLI; check "a window picked on the overlay: exit status" 0 $?
+    check "the window picked is the one under the pointer" "300x200" "$(identify -format "%wx%h" "$SMOKE_OUT/picked.png" 2>/dev/null || echo none)"
+    convert "$PNG" -crop 300x200+100+80 +repage "$SMOKE_OUT/picked-want.png"
+    check "the window picked has its pixels from the screen" 0 "$(compare -metric AE "$SMOKE_OUT/picked.png" "$SMOKE_OUT/picked-want.png" null: 2>&1 | cut -d" " -f1)"
+    "$BIN" --window --save "$SMOKE_OUT/tabbed.png" >/dev/null 2>&1 &
+    CLI=$!
+    sleep 3; xdotool mousemove 250 180; sleep 0.3; xdotool key Tab; sleep 0.3; xdotool key Return; wait $CLI
+    check "Tab then Enter takes the next window" "${W}x${H}" "$(identify -format "%wx%h" "$SMOKE_OUT/tabbed.png" 2>/dev/null || echo none)"
+    "$BIN" --window --save "$SMOKE_OUT/never-window.png" >/dev/null 2>&1 &
+    CLI=$!
+    sleep 3; xdotool key Escape; wait $CLI; check "Escape in the window picker exit status" 3 $?
+    unset OBTURA_FAKE_WINDOWS
+    # Full screen with one screen: the whole picture, without asking, whatever screen was
+    # remembered (here one not connected).
+    /usr/bin/python3 -c "import json,os,sys; p=sys.argv[1]; s=json.load(open(p)) if os.path.exists(p) else {}; s[\"full_screen\"]=\"DP-99\"; os.makedirs(os.path.dirname(p), exist_ok=True); json.dump(s, open(p, \"w\"))" "$XDG_CONFIG_HOME/obtura/settings.json"
+    timeout 30 "$BIN" --screen --save "$SMOKE_OUT/one-screen.png" >/dev/null 2>&1; check "one screen: Full Screen does not ask" 0 $?
+    check "one screen: Full Screen takes it all" "${W}x${H}" "$(identify -format "%wx%h" "$SMOKE_OUT/one-screen.png" 2>/dev/null || echo none)"
     # --qr on a picture without a code: nothing copied, so Obtura ends, with exit status 1.
     timeout 30 "$BIN" --screen --qr >/dev/null 2>&1; check "--qr with no code exit status" 1 $?
     # --qr reads the QR codes of the picture (a fixture with two), copies and prints them. Having

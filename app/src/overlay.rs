@@ -10,12 +10,16 @@
 //! Shift+arrows resize by one pixel. Enter or double-click accepts, Escape or right-click
 //! cancels. When recording, a click (no drag) chooses the whole screen under the pointer,
 //! and a countdown runs on the overlay before it goes.
+//!
+//! The same overlay also chooses a whole screen (full screen with several screens: one, or all
+//! of them) and, where the system lists the windows (Windows), a window: what is under the
+//! pointer lights up and a click takes it.
 
 use gtk::prelude::*;
 use gtk::{cairo, gdk, gdk_pixbuf::Pixbuf, glib};
 use obtura_image::{Bitmap, Rect};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     rc::Rc,
     time::Duration,
 };
@@ -33,6 +37,18 @@ pub enum Purpose {
     /// Measure on the screen: a drag draws a ruler (length, width, height, angle in pixels);
     /// Enter copies the measurement, Escape closes.
     Measure,
+    /// Full screen with several screens: the screen under the pointer lights up, a click takes
+    /// it; All Screens (or A) takes them all (see [`choose_screen`]).
+    ChooseScreen,
+    /// A window: the window under the pointer lights up, a click takes it (see [`pick_window`]).
+    Window,
+}
+
+impl Purpose {
+    /// What is chosen is a whole thing under the pointer (a screen, a window): nothing to drag.
+    fn points(self) -> bool {
+        matches!(self, Purpose::RecordScreen | Purpose::ChooseScreen | Purpose::Window)
+    }
 }
 
 /// A ruler drawn on the screen: from `a` to `b`, desktop (logical) coordinates.
@@ -204,6 +220,13 @@ struct State {
     share_again: Option<Box<dyn FnOnce()>>,
     /// Measuring: the ruler drawn.
     ruler: Option<Ruler>,
+    /// Picking a window: the windows (desktop coordinates, the front one first) and what is
+    /// said about each (title and size).
+    windows: Vec<(R, String)>,
+    /// The screen or window under the pointer (none: all screens, or no window there).
+    hover: Rc<Cell<Option<usize>>>,
+    /// Choosing a screen: what is said about each one (in the order of the monitors).
+    labels: Vec<String>,
 }
 
 impl State {
@@ -240,6 +263,40 @@ impl State {
     fn select_screen(&mut self, i: usize) {
         self.proposed = false;
         self.sel = Some(self.screen_rect(i));
+        self.hover.set(Some(i));
+    }
+
+    /// Every screen at once.
+    fn select_all(&mut self) {
+        self.proposed = false;
+        self.sel = Some(R { x: 0.0, y: 0.0, w: self.desktop.0, h: self.desktop.1 });
+        self.hover.set(None);
+    }
+
+    /// The front window under desktop point (x, y).
+    fn window_at(&self, x: f64, y: f64) -> Option<usize> {
+        self.windows.iter().position(|(r, _)| r.contains(x, y))
+    }
+
+    fn select_window(&mut self, j: Option<usize>) {
+        self.hover.set(j);
+        self.sel = j.and_then(|j| self.windows.get(j)).map(|(r, _)| *r);
+    }
+
+    /// The screen or window under the pointer at (x, y) on monitor `i` lights up; whether
+    /// that changed what is lit.
+    fn point_at(&mut self, i: usize, x: f64, y: f64) -> bool {
+        let before = (self.sel, self.hover.get());
+        match self.purpose {
+            Purpose::RecordScreen | Purpose::ChooseScreen => self.select_screen(i),
+            Purpose::Window => {
+                let (ox, oy) = self.mons[i].origin;
+                let j = self.window_at(ox + x, oy + y);
+                self.select_window(j);
+            }
+            _ => return false,
+        }
+        before != (self.sel, self.hover.get())
     }
 }
 
@@ -343,6 +400,12 @@ pub fn desktop() -> Result<Desktop, String> {
     Ok(Desktop { screens, origin: (min_x, min_y) })
 }
 
+/// The name the system gives each monitor (its connector, "DP-7"; empty if none), in the order
+/// of [`desktop`]'s screens.
+pub fn monitor_names() -> Vec<String> {
+    list_monitors().map(|v| v.iter().map(|(m, _)| m.connector().map(|c| c.to_string()).unwrap_or_default()).collect()).unwrap_or_default()
+}
+
 /// Shows the overlay over `shot` (a picture of the whole desktop, physical pixels), proposing
 /// `last` (the region chosen last time, physical pixels of the shot). When recording,
 /// `countdown` seconds are counted on the overlay after accepting. `shared` (desktop logical
@@ -370,6 +433,98 @@ pub fn count_down(shot: &Bitmap, area: (f64, f64, f64, f64), seconds: u32, done:
 /// clicked (a 1 x 1 area), Escape with `None`.
 pub fn pick_color(shot: Rc<Bitmap>, done: Done) -> Result<(), String> {
     show(&shot.clone(), Purpose::Capture, None, 0, None, Some(shot), None, done).map(|_| ())
+}
+
+/// What the screen chooser answers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScreenChoice {
+    /// The screen at this place in [`desktop`]'s list.
+    One(usize),
+    All,
+}
+
+const CHOOSER_CSS: &str = ".obtura-chooser { background: alpha(black, 0.78); color: white; border-radius: 14px; padding: 14px 20px; } .obtura-chooser label.dim-label { color: alpha(white, 0.75); }";
+
+/// Full screen with several screens: `shot` (the whole desktop) with each screen's `labels` (in
+/// the order of [`desktop`]'s screens). A click takes the screen under the pointer (or its
+/// number, 1 to 9; arrows light up the next one, Enter takes it), All Screens (or A) every
+/// screen. The answer says too whether "Remember my choice" (ticked at first) was left ticked.
+/// `None`: cancelled. If the overlay cannot be shown, `done` is never called.
+pub fn choose_screen(shot: &Bitmap, labels: Vec<String>, done: Box<dyn FnOnce(Option<(ScreenChoice, bool)>)>) -> Result<(), String> {
+    let hover = Rc::new(Cell::new(None));
+    let remember = Rc::new(Cell::new(true));
+    let (h2, r2) = (hover.clone(), remember.clone());
+    let st = show(shot, Purpose::ChooseScreen, None, 0, None, None, None, Box::new(move |area| done(area.map(|_| (h2.get().map_or(ScreenChoice::All, ScreenChoice::One), r2.get())))))?;
+    let windows: Vec<gtk::Window> = {
+        let mut s = st.borrow_mut();
+        s.hover = hover;
+        s.labels = labels;
+        s.mons.iter().map(|m| m.window.clone()).collect()
+    };
+    thread_local!(static STYLED: Cell<bool> = const { Cell::new(false) });
+    if let Some(display) = gdk::Display::default().filter(|_| !STYLED.replace(true)) {
+        let css = gtk::CssProvider::new();
+        css.load_from_string(CHOOSER_CSS);
+        gtk::style_context_add_provider_for_display(&display, &css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+    }
+    // On every screen: All Screens, and "Remember my choice" (the same tick on all of them).
+    let checks: Rc<RefCell<Vec<gtk::CheckButton>>> = Rc::default();
+    for w in windows {
+        let Some(overlay) = w.child().and_downcast::<gtk::Overlay>() else { continue };
+        let all = gtk::Button::with_label("All Screens");
+        all.set_tooltip_text(Some("Capture every screen in one picture (A)"));
+        let check = gtk::CheckButton::with_label("Remember my choice");
+        check.set_active(true);
+        check.set_tooltip_text(Some("Full Screen then takes the same screen without asking"));
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 18);
+        row.set_halign(gtk::Align::Center);
+        row.append(&all);
+        row.append(&check);
+        let note = gtk::Label::new(Some("You can change it later in Preferences › Full Screen"));
+        note.add_css_class("dim-label");
+        note.add_css_class("caption");
+        let panel = gtk::Box::new(gtk::Orientation::Vertical, 8);
+        panel.add_css_class("obtura-chooser");
+        panel.append(&row);
+        panel.append(&note);
+        panel.set_halign(gtk::Align::Center);
+        panel.set_valign(gtk::Align::Center);
+        panel.set_margin_top(90);
+        overlay.add_overlay(&panel);
+        {
+            let st = st.clone();
+            all.connect_clicked(move |_| {
+                st.borrow_mut().select_all();
+                finish(&st, true);
+            });
+        }
+        {
+            let (remember, checks) = (remember.clone(), checks.clone());
+            check.connect_toggled(move |c| {
+                remember.set(c.is_active());
+                for other in checks.borrow().iter().filter(|o| *o != c && o.is_active() != c.is_active()) {
+                    other.set_active(c.is_active());
+                }
+            });
+        }
+        checks.borrow_mut().push(check);
+    }
+    Ok(())
+}
+
+/// A window: `shot` (the whole desktop) and the `windows` on it, the front one first, each with
+/// its place in `shot` (physical pixels) and what is said about it. The window under the pointer
+/// lights up (Tab: the next one); a click or Enter takes it: the answer is its place in the list.
+/// `None`: cancelled. If the overlay cannot be shown, `done` is never called.
+pub fn pick_window(shot: &Bitmap, windows: Vec<(Rect, String)>, done: Box<dyn FnOnce(Option<usize>)>) -> Result<(), String> {
+    let hover = Rc::new(Cell::new(None));
+    let h2 = hover.clone();
+    let st = show(shot, Purpose::Window, None, 0, None, None, None, Box::new(move |area| done(area.and(h2.get()))))?;
+    let mut s = st.borrow_mut();
+    let (fx, fy) = (s.fx, s.fy);
+    s.windows = windows.into_iter().map(|(r, said)| (R { x: r.x as f64 / fx, y: r.y as f64 / fy, w: r.w as f64 / fx, h: r.h as f64 / fy }, said)).collect();
+    s.hover = hover;
+    Ok(())
 }
 
 /// The region proposed, in logical pixels: `last` (physical) as far as it lies on the desktop.
@@ -410,6 +565,9 @@ fn show(shot: &Bitmap, purpose: Purpose, last: Option<Rect>, countdown: u32, sha
         shared,
         share_again,
         ruler: None,
+        windows: Vec::new(),
+        hover: Rc::new(Cell::new(None)),
+        labels: Vec::new(),
     }));
 
     for (i, (monitor, g)) in monitors.iter().enumerate() {
@@ -429,6 +587,8 @@ fn show(shot: &Bitmap, purpose: Purpose, last: Option<Rect>, countdown: u32, sha
             (false, Purpose::RecordScreen) => "Obtura: choose the screen to record",
             (false, Purpose::Measure) => "Obtura: measure",
             (false, Purpose::Scroll) => "Obtura: select what scrolls",
+            (false, Purpose::ChooseScreen) => "Obtura: choose the screen to capture",
+            (false, Purpose::Window) => "Obtura: choose the window to capture",
         }));
         let (px, py) = ((ox * fx).round() as i32, (oy * fy).round() as i32);
         let pw = ((g.width() as f64 * fx).round() as i32).min(full.width() - px).max(1);
@@ -449,7 +609,7 @@ fn show(shot: &Bitmap, purpose: Purpose, last: Option<Rect>, countdown: u32, sha
         }
         if purpose == Purpose::Measure {
             area.add_controller(ruler_controller(&st, i));
-        } else if !picking && purpose != Purpose::RecordScreen {
+        } else if !picking && !purpose.points() {
             area.add_controller(drag_controller(&st, i));
         }
         area.add_controller(click_controller(&st, i));
@@ -587,7 +747,7 @@ fn drag_controller(st: &Rc<RefCell<State>>, i: usize) -> gtk::GestureDrag {
             // chooses the whole screen under the pointer.
             if dx.abs() < 3.0 && dy.abs() < 3.0 && matches!(s.drag, Some(Drag::New { .. })) {
                 s.sel = match s.purpose {
-                    Purpose::Capture | Purpose::Measure | Purpose::Scroll => s.before_click,
+                    Purpose::Capture | Purpose::Measure | Purpose::Scroll | Purpose::ChooseScreen | Purpose::Window => s.before_click,
                     Purpose::Record | Purpose::RecordScreen => {
                         s.proposed = false;
                         let m = &s.mons[i];
@@ -612,11 +772,16 @@ fn click_controller(st: &Rc<RefCell<State>>, _i: usize) -> gtk::GestureClick {
             let (ox, oy) = st.borrow().mons[_i].origin;
             pick_at(&st, ox + x, oy + y);
         }
-        1 if st.borrow().purpose == Purpose::RecordScreen => {
+        1 if matches!(st.borrow().purpose, Purpose::RecordScreen | Purpose::ChooseScreen) => {
             if st.borrow().countdown.is_none() {
                 st.borrow_mut().select_screen(_i);
                 finish(&st, true);
             }
+        }
+        // The window under the pointer (nothing happens over the bare desktop).
+        1 if st.borrow().purpose == Purpose::Window => {
+            st.borrow_mut().point_at(_i, x, y);
+            finish(&st, true);
         }
         1 if n == 2 && st.borrow().purpose != Purpose::Measure => finish(&st, true),
         _ => {}
@@ -637,13 +802,23 @@ fn pick_at(st: &Rc<RefCell<State>>, x: f64, y: f64) {
 /// The cursor shows what a drag will do: resize arrows on a handle, a grabbing hand inside.
 fn motion_controller(st: &Rc<RefCell<State>>, i: usize) -> gtk::EventControllerMotion {
     let motion = gtk::EventControllerMotion::new();
+    {
+        // The overlay came up under the pointer: what is there lights up before it moves.
+        let st = st.clone();
+        motion.connect_enter(move |_, x, y| {
+            if let Ok(mut s) = st.try_borrow_mut() {
+                if s.purpose.points() && s.countdown.is_none() && s.point_at(i, x, y) {
+                    s.redraw();
+                }
+            }
+        });
+    }
     let st = st.clone();
     motion.connect_motion(move |_, x, y| {
         if let Ok(mut s) = st.try_borrow_mut() {
-            if s.purpose == Purpose::RecordScreen {
-                // The screen under the pointer is the one a click records.
-                if s.countdown.is_none() && s.sel != Some(s.screen_rect(i)) {
-                    s.select_screen(i);
+            if s.purpose.points() {
+                // The screen or window under the pointer is the one a click takes.
+                if s.countdown.is_none() && s.point_at(i, x, y) {
                     s.redraw();
                 }
                 return;
@@ -688,6 +863,47 @@ fn key_controller(st: &Rc<RefCell<State>>) -> gtk::EventControllerKey {
                 finish(&st, false);
                 return glib::Propagation::Stop;
             }
+            // Choosing a screen: A takes them all, 1 to 9 one of them.
+            gdk::Key::a | gdk::Key::A if st.borrow().purpose == Purpose::ChooseScreen => {
+                st.borrow_mut().select_all();
+                finish(&st, true);
+                return glib::Propagation::Stop;
+            }
+            k if st.borrow().purpose == Purpose::ChooseScreen && k.to_unicode().and_then(|c| c.to_digit(10)).is_some_and(|n| (1..=st.borrow().mons.len() as u32).contains(&n)) => {
+                let n = k.to_unicode().and_then(|c| c.to_digit(10)).unwrap_or(1) as usize;
+                st.borrow_mut().select_screen(n - 1);
+                finish(&st, true);
+                return glib::Propagation::Stop;
+            }
+            // Arrows light up the screen beside; for windows, Tab too (Shift+Tab: the one before).
+            gdk::Key::Left | gdk::Key::Right | gdk::Key::Up | gdk::Key::Down if st.borrow().purpose == Purpose::ChooseScreen => {
+                let mut s = st.borrow_mut();
+                let n = s.mons.len();
+                let back = matches!(key, gdk::Key::Left | gdk::Key::Up);
+                let i = match s.hover.get() {
+                    Some(i) if back => (i + n - 1) % n,
+                    Some(i) => (i + 1) % n,
+                    None => 0,
+                };
+                s.select_screen(i);
+                s.redraw();
+                return glib::Propagation::Stop;
+            }
+            gdk::Key::Tab | gdk::Key::ISO_Left_Tab | gdk::Key::Left | gdk::Key::Right | gdk::Key::Up | gdk::Key::Down if st.borrow().purpose == Purpose::Window => {
+                let mut s = st.borrow_mut();
+                let n = s.windows.len();
+                if n > 0 {
+                    let back = matches!(key, gdk::Key::ISO_Left_Tab | gdk::Key::Left | gdk::Key::Up) || mods.contains(gdk::ModifierType::SHIFT_MASK);
+                    let j = match s.hover.get() {
+                        Some(j) if back => (j + n - 1) % n,
+                        Some(j) => (j + 1) % n,
+                        None => 0,
+                    };
+                    s.select_window(Some(j));
+                    s.redraw();
+                }
+                return glib::Propagation::Stop;
+            }
             gdk::Key::Return | gdk::Key::KP_Enter => {
                 let pointer = st.borrow().pick.as_ref().and(st.borrow().pointer);
                 match pointer {
@@ -721,7 +937,7 @@ fn key_controller(st: &Rc<RefCell<State>>) -> gtk::EventControllerKey {
             _ => return glib::Propagation::Proceed,
         };
         let mut s = st.borrow_mut();
-        if s.countdown.is_some() || s.purpose == Purpose::RecordScreen {
+        if s.countdown.is_some() || s.purpose.points() {
             return glib::Propagation::Stop;
         }
         s.proposed = false;
@@ -818,6 +1034,49 @@ fn draw(s: &State, i: usize, cr: &cairo::Context, w: i32, h: i32) {
         return;
     }
 
+    if s.purpose == Purpose::ChooseScreen {
+        // The screen under the pointer (or every screen, for All Screens) is lit and framed.
+        if s.sel.is_some_and(|r| r.intersects(&this_screen)) {
+            cr.set_source_rgb(1.0, 1.0, 1.0);
+            cr.set_line_width(4.0);
+            cr.rectangle(2.0, 2.0, fw - 4.0, fh - 4.0);
+            let _ = cr.stroke();
+        }
+        if let Some(said) = s.labels.get(i) {
+            cr.set_font_size(22.0);
+            centred(said, fh / 2.0 - 96.0);
+            cr.set_font_size(15.0);
+        }
+        centred("Click to capture this screen · A: all screens · Esc to cancel", fh / 2.0 - 56.0);
+        return;
+    }
+
+    if s.purpose == Purpose::Window {
+        if let Some(r) = s.sel {
+            cr.set_source_rgb(1.0, 1.0, 1.0);
+            cr.set_line_width(3.0);
+            cr.rectangle(r.x - ox + 1.5, r.y - oy + 1.5, (r.w - 3.0).max(0.0), (r.h - 3.0).max(0.0));
+            let _ = cr.stroke();
+            // Its title and size, inside its top-left corner where it is on this screen.
+            let (x0, y0) = (r.x - ox, r.y - oy);
+            if x0 < fw && y0 < fh && x0 + r.w > 0.0 && y0 + r.h > 0.0 {
+                if let Some((_, said)) = s.hover.get().and_then(|j| s.windows.get(j)) {
+                    label(said, x0.max(0.0) + 12.0, y0.max(0.0) + 34.0);
+                }
+            }
+        }
+        let hint = if s.windows.is_empty() {
+            "There is no window to capture · Esc to cancel"
+        } else if s.sel.is_some() {
+            "Click to capture this window · Tab: next window · Esc to cancel"
+        } else {
+            "Point at the window to capture · Esc to cancel"
+        };
+        let at_top = s.sel.is_none_or(|r| r.y - oy > 70.0 || r.y + r.h - oy < 0.0);
+        centred(hint, if at_top { 40.0 } else { fh - 24.0 });
+        return;
+    }
+
     if s.purpose == Purpose::RecordScreen {
         if s.sel.is_some_and(|r| r == this_screen) {
             cr.set_source_rgb(1.0, 1.0, 1.0);
@@ -856,7 +1115,7 @@ fn draw(s: &State, i: usize, cr: &cairo::Context, w: i32, h: i32) {
                 centred("Then scroll it slowly with the mouse wheel; Obtura joins what comes into view", fh / 2.0 + 32.0);
             }
             Purpose::Record => centred("Drag to choose what to record · click a screen to record all of it · Esc to cancel", fh / 2.0),
-            Purpose::RecordScreen | Purpose::Measure => {}
+            Purpose::RecordScreen | Purpose::Measure | Purpose::ChooseScreen | Purpose::Window => {}
         },
     }
     if let (Some(r), None) = (s.sel, &s.drag) {
@@ -866,7 +1125,7 @@ fn draw(s: &State, i: usize, cr: &cairo::Context, w: i32, h: i32) {
             (Purpose::Record, true) => "Enter or double-click to record the same region as last time · drag elsewhere for a new one · Esc to cancel",
             (Purpose::Record, false) => "Enter or double-click to start recording · Esc to cancel",
             (Purpose::RecordScreen, _) => "Click the screen to record · Esc to cancel",
-            (Purpose::Measure, _) => "",
+            (Purpose::Measure | Purpose::ChooseScreen | Purpose::Window, _) => "",
             (Purpose::Scroll, _) => "Enter or double-click to start, then scroll slowly · finish from Obtura's icon in the top bar · Esc to cancel",
         };
         // At the top of the screen, unless the selection is there.

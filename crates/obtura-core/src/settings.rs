@@ -44,7 +44,16 @@ pub struct Settings {
     /// Windows: Print Screen and the other keys work in every app (on Linux these keys are in
     /// GNOME's own keyboard shortcuts, not here).
     pub keys_everywhere: bool,
+    /// What Full Screen takes when there are several screens: [`FULL_SCREEN_ASK`] (Obtura asks,
+    /// and may remember the answer), [`FULL_SCREEN_ALL`] (every screen in one picture), or the
+    /// name of the screen chosen (as the app finds it again: "DP-7", `\\.\DISPLAY1`...).
+    pub full_screen: String,
 }
+
+/// [`Settings::full_screen`]: ask which screen.
+pub const FULL_SCREEN_ASK: &str = "";
+/// [`Settings::full_screen`]: every screen.
+pub const FULL_SCREEN_ALL: &str = "all";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -109,6 +118,7 @@ impl Default for Settings {
             color_format: crate::color::ColorFormat::Hex,
             new_capture: "region".into(),
             keys_everywhere: true,
+            full_screen: FULL_SCREEN_ASK.into(),
         }
     }
 }

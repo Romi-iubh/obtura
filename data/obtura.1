@@ -1,4 +1,4 @@
-.TH OBTURA 1 "November 2026" "Obtura 0.9.1" "User Commands"
+.TH OBTURA 1 "November 2026" "Obtura 0.9.2" "User Commands"
 .SH NAME
 obtura \- take, annotate and redact screenshots, and record the screen
 .SH SYNOPSIS
@@ -26,14 +26,16 @@ The user guide opens with \fBF1\fR in any Obtura window.
 Select a part of the screen, then open it in the editor.
 .TP
 .B \-\-screen
-Capture the whole screen.
+Capture the whole screen. With several screens, Obtura asks the first time which one to
+keep (or all of them) and remembers the choice; the Full Screen setting in Preferences
+changes it.
 .TP
 .B \-\-last\-region
 Capture the region chosen last time, without asking (asks when there is none).
 .TP
 .B \-\-window
 Capture a window: GNOME lists the open windows and asks which one (with
-\fB\-\-record\fR: record that window).
+\fB\-\-record\fR: record that window). On Windows, the window is clicked on the screen.
 .TP
 .B \-\-scroll
 Scrolling capture: select the part of the screen that scrolls, press Enter, then scroll

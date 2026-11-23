@@ -10,11 +10,13 @@ pub struct FakeBackend {
     /// Captures still to refuse with [`CaptureError::NeedsPermission`], as GNOME does before the
     /// user was asked (see [`FakeBackend::asking_permission`]).
     refusals: Cell<u32>,
+    /// Windows on the fake screen, as Windows lists them (see [`FakeBackend::with_windows`]).
+    windows: Option<Vec<crate::Place>>,
 }
 
 impl FakeBackend {
     pub fn from_png(png: Vec<u8>) -> Result<Self, CaptureError> {
-        Ok(Self { result: Ok(Shot::from_png(png)?), page: None, refusals: Cell::new(0) })
+        Ok(Self { result: Ok(Shot::from_png(png)?), page: None, refusals: Cell::new(0), windows: None })
     }
 
     /// The first screenshot is refused because the user was never asked, as on a fresh GNOME;
@@ -36,15 +38,26 @@ impl FakeBackend {
         Ok(self)
     }
 
+    /// The fake screen holds these windows (front first), listed as Windows lists them, so the
+    /// window is picked on Obtura's own overlay (as on Windows) rather than in GNOME's list.
+    pub fn with_windows(mut self, windows: Vec<crate::Place>) -> Self {
+        self.windows = Some(windows);
+        self
+    }
+
     /// A backend whose every capture fails with `error` (for testing the error paths).
     pub fn failing(error: CaptureError) -> Self {
-        Self { result: Err(error), page: None, refusals: Cell::new(0) }
+        Self { result: Err(error), page: None, refusals: Cell::new(0), windows: None }
     }
 }
 
 impl CaptureBackend for FakeBackend {
     fn shares_real_screen(&self) -> bool {
         false
+    }
+
+    fn windows(&self) -> Option<Vec<crate::Place>> {
+        self.windows.clone()
     }
 
     fn capture(&self, _request: CaptureRequest, done: Done) {

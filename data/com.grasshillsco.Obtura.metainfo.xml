@@ -61,19 +61,19 @@
   <screenshots>
     <screenshot type="default">
       <caption>The editor: arrows, text, numbered steps and a blurred email address</caption>
-      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.1/docs/screenshots/editor.png</image>
+      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.2/docs/screenshots/editor.png</image>
     </screenshot>
     <screenshot>
       <caption>Beautify: background, shadow and window bar in one click</caption>
-      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.1/docs/screenshots/beautify.png</image>
+      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.2/docs/screenshots/beautify.png</image>
     </screenshot>
     <screenshot>
       <caption>Smart Redact finds what should not be shared</caption>
-      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.1/docs/screenshots/smart-redact.png</image>
+      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.2/docs/screenshots/smart-redact.png</image>
     </screenshot>
     <screenshot>
       <caption>Recording the screen as MP4, WebM or GIF</caption>
-      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.1/docs/screenshots/record.png</image>
+      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.2/docs/screenshots/record.png</image>
     </screenshot>
   </screenshots>
   <provides>
@@ -88,6 +88,18 @@
   </requires>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.9.2" date="2026-11-23">
+      <description>
+        <p>Choose the screen, choose the window.</p>
+        <ul>
+          <li>Full Screen with several screens asks the first time which screen to keep, or
+          all of them, and remembers the choice (Preferences › Behaviour › Full Screen
+          changes it)</li>
+          <li>Windows: A Window lets you click the window to capture, instead of taking the
+          window in front</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.9.1" date="2026-11-23">
       <description>
         <p>Obtura for Windows, and fixes.</p>

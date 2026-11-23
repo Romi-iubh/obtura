@@ -52,7 +52,7 @@ account and sends nothing anywhere.
 
 Open the [Obtura releases page](https://github.com/Romi-iubh/obtura/releases/latest)
 and download the file whose name ends in `_amd64.deb`, for example
-`obtura_0.9.1-1_amd64.deb`. It goes to your **Downloads** folder.
+`obtura_0.9.2-1_amd64.deb`. It goes to your **Downloads** folder.
 
 ### Install with the Terminal (recommended)
 
@@ -63,7 +63,7 @@ for reading text (Tesseract).
 2. Type the line below and press **Enter**:
 
    ```
-   sudo apt install ~/Downloads/obtura_0.9.1-1_amd64.deb
+   sudo apt install ~/Downloads/obtura_0.9.2-1_amd64.deb
    ```
 
 3. Type your password when asked (nothing shows while you type) and press **Enter**.
@@ -180,14 +180,27 @@ not share with Obtura looks dark; press **S** to choose again which screens to s
 
 ### The whole screen
 
-**Capture Screen** (**Ctrl+Shift+F**) takes every screen at once. GNOME flashes the
-screen at that moment.
+**Capture Screen** (**Ctrl+Shift+F**) takes the whole screen. GNOME flashes the screen
+at that moment.
+
+**With more than one screen**, Obtura asks the first time which one you want: your
+screens show the picture just taken, and the screen under the pointer lights up. Click
+it to keep that screen, or click **All Screens** (or press **A**) for every screen in one
+picture. **1**, **2**… choose a screen by its number, the arrow keys light up the next
+one and **Enter** takes it; **Esc** cancels.
+
+**Remember my choice** is ticked: the next Full Screen captures take the same screen (or
+all of them) at once, without asking. Untick it to be asked again next time. To change
+the choice later: **Preferences › Behaviour › Full Screen** (**Ask Which Screen**, **All
+Screens**, or one screen by its name). If the screen you chose is not connected, Obtura
+asks again.
 
 ### A window
 
 **A Window** beside the editor's **New** button, or `obtura --window`: GNOME lists the open
 windows; pick one and its picture opens in the editor, without what is around or above
-it.
+it. (On Windows you click the window on the screen instead: see
+[Obtura on Windows](#18-obtura-on-windows).)
 
 ### The same region again
 
@@ -592,9 +605,9 @@ Every capture can be started from a Terminal, a script or a keyboard shortcut.
 | Command | What it does |
 | --- | --- |
 | `obtura --region` | Choose a region, then open the editor |
-| `obtura --screen` | The whole screen |
+| `obtura --screen` | The whole screen (with several screens: the one chosen, see [The whole screen](#the-whole-screen)) |
 | `obtura --last-region` | The region chosen last time, without asking |
-| `obtura --window` | A window, picked in GNOME's list |
+| `obtura --window` | A window, picked in GNOME's list (on Windows: click it) |
 | `obtura --scroll` | Scrolling capture; run it again to finish |
 | `obtura --region --delay 5` | Wait 5 seconds first (0 to 30) |
 | `obtura --region --copy` | Copy to the clipboard, no editor |
@@ -625,7 +638,7 @@ which keeps the clipboard: in a script, start them with `&`.
 | Group | Settings |
 | --- | --- |
 | **Saving** | The folder for pictures; the file name, with codes for the date and time (`%Y` year, `%m` month, `%d` day, `%H` hour, `%M` minute, `%S` second) and an example |
-| **Behaviour** | Copy to the clipboard after a capture; keep running in the background (the next capture is instant); use screen sharing (no white flash); the screens Obtura may see |
+| **Behaviour** | Copy to the clipboard after a capture; keep running in the background (the next capture is instant); use screen sharing (no white flash); **Full Screen**: with several screens, which one Full Screen takes (ask, all screens, or one screen); the screens Obtura may see |
 | **Library** | Keep every screenshot; read their text for the search; remove screenshots older than a number of days (0 keeps all) |
 | **Text reading** | The languages to read, for example `eng+fra`; empty uses those installed |
 | **Colour picker** | Copy colours as `#rrggbb`, `rgb(r, g, b)` or `hsl(h, s%, l%)` |
@@ -707,6 +720,10 @@ To read text in other languages, install them, for example French and German:
 that screen with Obtura. Press **S** and select every screen in GNOME's window, with
 **Remember this selection** ticked. Or use **Preferences › Screens Obtura may see ›
 Choose Again**.
+
+**Full Screen takes only one screen (or all of them) and I want the other** — Obtura
+remembers the choice you made the first time. Change it in **Preferences › Behaviour ›
+Full Screen**; **Ask Which Screen** makes it ask again.
 
 **GNOME's screen-sharing icon appears after a screenshot** — that is how Obtura avoids
 GNOME's white flash. It goes after a few seconds. To use GNOME's screenshot service
@@ -818,7 +835,7 @@ read "Windows" and "the notification area" (the icons by the clock).
 
 ### Install
 
-1. Download `Obtura-0.9.1-setup.exe`.
+1. Download `Obtura-0.9.2-setup.exe`.
 2. Double-click it. If Windows says **Windows protected your PC** (the installer is not
    signed by a company), click **More info**, then **Run anyway**.
 3. Click **Next** until **Finish**. Obtura is installed for you only, in
@@ -827,7 +844,7 @@ read "Windows" and "the notification area" (the icons by the clock).
    at once), and a shortcut on the desktop (off).
 
 Obtura is then in the Start menu. To run it without installing, unpack
-`Obtura-0.9.1-windows-x64.zip`, open the folders **Obtura**, then **bin**, and
+`Obtura-0.9.2-windows-x64.zip`, open the folders **Obtura**, then **bin**, and
 double-click **obtura.exe** (keep the folders together).
 
 **Update**: run the new installer. **Remove**: Windows **Settings › Apps › Installed
@@ -856,9 +873,11 @@ page.
 
 - **No question, no flash.** Windows lets Obtura read the screen directly: the first
   capture does not ask anything, and the screen never flashes.
-- **A window** (New › A Window…): Obtura captures the window you were using, the one in
-  front of the others. Click that window first, then use the menu of Obtura's icon or
-  the New button.
+- **A window** (New › A Window…, or the menu of Obtura's icon): the screen stands still
+  and the window under the pointer lights up, with its name and size. Click it to capture
+  it (**Tab** lights up the next window, **Enter** takes it, **Esc** cancels). The picture
+  is the window as it is on the screen: anything in front of it is in it too, so bring it
+  to the front first.
 - **Scrolling capture**: to finish, press **Print Screen** again, or click Obtura's
   icon. A message by the clock says so when the capture starts.
 - **Pins** stay above the other windows; right-click a pin, **Keep Above Other Windows**,
@@ -870,7 +889,7 @@ page.
   `AppData\Local\Programs\Obtura\share\tessdata`, then name it in **Preferences ›
   Text reading**.
 - **Command line**: the options of [The command line](#12-the-command-line) work, apart
-  from `--record` (`--window` takes the window in front), with the full path of the program:
+  from `--record` (`--window` lets you click the window), with the full path of the program:
   `"%LOCALAPPDATA%\Programs\Obtura\bin\obtura.exe" --region`. **Preferences › Other
   keys** shows each command ready to copy, and how to give it a key of its own.
 

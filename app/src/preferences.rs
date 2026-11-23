@@ -67,6 +67,26 @@ pub fn show(app: &adw::Application) {
     if !cfg!(windows) {
         behaviour.add(&switch_row(&settings, &dialog, "Use screen sharing (no white flash)", "Recommended. Turned off, Obtura uses GNOME's screenshot service instead, and the screen flashes white at each screenshot.", |s| s.quiet_capture, |s, v| s.quiet_capture = v));
     }
+    // Full Screen with several screens: which one (or all, or ask).
+    let choices = crate::screens::choices(&*crate::app::backend(), &settings.borrow().full_screen);
+    let names: Vec<&str> = choices.iter().map(|(_, label)| label.as_str()).collect();
+    // The choice shows under the title (a screen's name is long for the row's end).
+    let full_screen = adw::ComboRow::builder()
+        .title("Full Screen takes (with several screens)")
+        .use_subtitle(true)
+        .model(&gtk::StringList::new(&names))
+        .build();
+    full_screen.set_selected(choices.iter().position(|(id, _)| *id == settings.borrow().full_screen).unwrap_or(0) as u32);
+    {
+        let (settings, dialog) = (settings.clone(), dialog.clone());
+        full_screen.connect_selected_notify(move |r| {
+            if let Some((id, _)) = choices.get(r.selected() as usize) {
+                settings.borrow_mut().full_screen = id.clone();
+                store(&settings, &dialog);
+            }
+        });
+    }
+    behaviour.add(&full_screen);
     let screens = adw::ActionRow::builder().title("Screens Obtura may see").subtitle("GNOME asked once and remembers. Choose again to add a screen.").build();
     let again = gtk::Button::builder().label("Choose Again").valign(gtk::Align::Center).sensitive(obtura_core::screen_share::load().is_some()).build();
     {
@@ -291,6 +311,7 @@ fn store(settings: &Rc<RefCell<Settings>>, dialog: &adw::PreferencesDialog) {
     file.history_days = mine.history_days;
     file.ocr_languages = mine.ocr_languages.clone();
     file.color_format = mine.color_format;
+    file.full_screen = mine.full_screen.clone();
     file.record.dir = mine.record.dir.clone();
     file.record.template = mine.record.template.clone();
     if let Err(e) = file.save() {

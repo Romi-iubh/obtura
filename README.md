@@ -52,11 +52,11 @@ internet, has no account and collects nothing.
 ## Install
 
 Obtura runs on **Ubuntu 24.04 LTS and newer** with the GNOME desktop, on 64-bit Intel and
-AMD computers. Download `obtura_0.9.1-1_amd64.deb` from the
+AMD computers. Download `obtura_0.9.2-1_amd64.deb` from the
 [releases page](https://github.com/Romi-iubh/obtura/releases/latest), then in a Terminal:
 
 ```
-sudo apt install ~/Downloads/obtura_0.9.1-1_amd64.deb
+sudo apt install ~/Downloads/obtura_0.9.2-1_amd64.deb
 ```
 
 apt also installs the programs Obtura uses for recording (GStreamer) and for reading
@@ -66,9 +66,9 @@ click **Use Super+Shift+S in Every App** in Obtura's start window. The
 
 ### Windows
 
-Obtura also runs on **Windows 10 and 11** (64-bit): download `Obtura-0.9.1-setup.exe`
+Obtura also runs on **Windows 10 and 11** (64-bit): download `Obtura-0.9.2-setup.exe`
 and run it (installed for you only, no administrator rights needed), or unpack
-`Obtura-0.9.1-windows-x64.zip` and run `Obtura\bin\obtura.exe`. **Print Screen**
+`Obtura-0.9.2-windows-x64.zip` and run `Obtura\bin\obtura.exe`. **Print Screen**
 captures a region from any app, and Obtura's icon by the clock offers the other
 captures. Screen recording is not in the Windows version yet. See
 [Obtura on Windows](docs/user-guide.md#18-obtura-on-windows) in the guide.

@@ -60,6 +60,15 @@ impl std::fmt::Display for CaptureError {
 
 impl std::error::Error for CaptureError {}
 
+/// A screen or a window as the system names it, and where it is in a picture from
+/// [`CaptureBackend::capture`] (physical pixels from the picture's top-left corner).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Place {
+    /// A screen: the system's name for it (Windows: `\\.\DISPLAY1`). A window: its title.
+    pub name: String,
+    pub rect: obtura_image::Rect,
+}
+
 /// Called once with the result. Backends may call it at once (the fake one) or later,
 /// from the main loop (a portal), so it is a callback and not a return value.
 pub type Done = Box<dyn FnOnce(Result<Shot, CaptureError>) + 'static>;
@@ -81,6 +90,21 @@ pub trait CaptureBackend {
     /// picture behind the overlay is taken with it rather than through screen sharing (Windows).
     fn capture_is_quiet(&self) -> bool {
         false
+    }
+
+    /// The screens and their exact places in a picture from [`capture`](Self::capture), when
+    /// the system tells an app (Windows). `None`: the app asks GTK (GNOME), whose layout the
+    /// picture follows.
+    fn screens(&self) -> Option<Vec<Place>> {
+        None
+    }
+
+    /// The windows on the screen now, the front one first, with their places in a picture from
+    /// [`capture`](Self::capture), when the system lets an app know them (Windows). Obtura's
+    /// own windows are left out. `None`: the system lists the windows itself (GNOME's list,
+    /// through screen sharing).
+    fn windows(&self) -> Option<Vec<Place>> {
+        None
     }
 
     /// Forgets the user's earlier "no" to screenshots, so that the system asks again at the

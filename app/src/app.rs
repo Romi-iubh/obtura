@@ -102,9 +102,11 @@ const USAGE: &str = "Usage: obtura [OPTIONS]
 
 Capture:
   --region          select a part of the screen
-  --screen          capture the whole screen
+  --screen          capture the whole screen (with several screens: the one
+                    chosen the first time, or all of them; see Preferences)
   --last-region     capture the region chosen last time (asks if there is none)
-  --window          capture a window, picked in GNOME's list of windows
+  --window          capture a window, picked in GNOME's list of windows (on
+                    Windows: click it on the screen)
   --scroll          scrolling capture: select what scrolls, then scroll it slowly;
                     run it again (or click Obtura's icon in the top bar) to finish
   --delay N         wait N seconds (0-30) before capturing
@@ -432,8 +434,10 @@ fn install_actions(app: &adw::Application, backend: &Rc<dyn CaptureBackend>) {
 
 /// The fake backend when `OBTURA_FAKE_CAPTURE` names a PNG (tests and `scripts/smoke.sh`;
 /// with `OBTURA_FAKE_PERMISSION=ask` its first screenshot is refused as GNOME does before the
-/// user was asked), the portals otherwise (on Windows, the screen itself).
-fn backend() -> Rc<dyn CaptureBackend> {
+/// user was asked; `OBTURA_FAKE_WINDOWS="x,y,w,h,Title;..."` lists windows on the fake screen,
+/// the front one first, so a window is picked on the overlay as on Windows), the portals
+/// otherwise (on Windows, the screen itself).
+pub(crate) fn backend() -> Rc<dyn CaptureBackend> {
     if let Some(path) = std::env::var_os("OBTURA_FAKE_CAPTURE").map(PathBuf::from) {
         // OBTURA_FAKE_SCROLL names a tall PNG the fake screen scrolls through (scrolling capture).
         let page = std::env::var_os("OBTURA_FAKE_SCROLL").and_then(|p| std::fs::read(p).ok());
@@ -444,7 +448,11 @@ fn backend() -> Rc<dyn CaptureBackend> {
             }),
             None => b,
         };
-        match FakeBackend::from_file(&path).map(scrolled) {
+        let windowed = |b: FakeBackend| match std::env::var("OBTURA_FAKE_WINDOWS") {
+            Ok(list) => b.with_windows(fake_windows(&list)),
+            Err(_) => b,
+        };
+        match FakeBackend::from_file(&path).map(scrolled).map(windowed) {
             Ok(b) if std::env::var("OBTURA_FAKE_PERMISSION").as_deref() == Ok("ask") => return Rc::new(b.asking_permission()),
             Ok(b) => return Rc::new(b),
             Err(e) => eprintln!("obtura: OBTURA_FAKE_CAPTURE: {e}"),
@@ -456,9 +464,31 @@ fn backend() -> Rc<dyn CaptureBackend> {
     Rc::new(obtura_capture::PortalBackend::new(APP_ID))
 }
 
+/// `OBTURA_FAKE_WINDOWS`: "x,y,w,h,Title" for each window, separated by ";" (a title may hold
+/// commas, not semicolons).
+fn fake_windows(list: &str) -> Vec<obtura_capture::Place> {
+    list.split(';')
+        .filter_map(|w| {
+            let mut f = w.splitn(5, ',');
+            let mut n = || f.next().map(str::trim);
+            let (x, y, w, h) = (n()?.parse().ok()?, n()?.parse().ok()?, n()?.parse().ok()?, n()?.parse().ok()?);
+            Some(obtura_capture::Place { rect: obtura_image::Rect::new(x, y, w, h), name: n().unwrap_or("").to_string() })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fake_windows_are_read_from_their_text() {
+        let w = fake_windows("10,20,300,200,Notes, draft; 0,0,50,50,Back");
+        assert_eq!(w.len(), 2);
+        assert_eq!((w[0].rect, w[0].name.as_str()), (obtura_image::Rect::new(10, 20, 300, 200), "Notes, draft"));
+        assert_eq!((w[1].rect, w[1].name.as_str()), (obtura_image::Rect::new(0, 0, 50, 50), "Back"));
+        assert!(fake_windows("nonsense").is_empty());
+    }
 
     fn parse(s: &str) -> Result<Command, String> {
         parse_args(&s.split_whitespace().map(String::from).collect::<Vec<_>>())

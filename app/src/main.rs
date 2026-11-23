@@ -20,6 +20,7 @@ mod overlay;
 mod pin;
 mod preferences;
 mod recorder;
+mod screens;
 mod scroll;
 mod tray;
 mod trim;

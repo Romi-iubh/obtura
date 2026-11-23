@@ -7,7 +7,7 @@
 #  3. --ocr reads the text of a picture with the bundled Tesseract (fake capture backend)
 #  4. --qr reads a QR code (fake capture backend)
 #  5. a region dragged on the overlay is saved at the size dragged
-#  6. "A Window" captures the window in front (Wine's Notepad)
+#  6. "A Window" shows the window picker; the Notepad clicked (behind another) is captured
 #  7. a scrolling capture of Notepad, scrolled with the wheel, finished with Print Screen
 #  8. Print Screen, a key in every app, opens the overlay
 #  9. the start window and the editor open; screenshots of them go to /out/*.png to look at;
@@ -81,16 +81,30 @@ check "--region --save exits with 0" 0 $?
 check "the region is the size dragged" 300x200 "$(identify -format '%wx%h' "$T/shots/region.png" 2>/dev/null)"
 wineserver -k 2>/dev/null; sleep 1
 
-# 6. A window: the one in front of the others that is not Obtura's (Wine's Notepad here).
+# 6. A window, picked on Obtura's overlay: two Notepads of different sizes; the one behind is
+#    clicked, so the picture must be that one (not the one in front).
+cp /src/LICENSE "$T/front.txt"
 wine notepad >/dev/null 2>&1 &
 sleep 6
-NOTEPAD=$(xdotool search --name 'Notepad' 2>/dev/null | head -1)
-timeout 120 wine "$BIN" --window --save "$(win "$T/shots/window.png")" >/dev/null 2>&1
+BACK=$(xdotool search --name 'Notepad' 2>/dev/null | head -1)
+xdotool windowsize "$BACK" 420 300 windowmove "$BACK" 60 60 2>/dev/null; sleep 1
+wine notepad "$(win "$T/front.txt")" >/dev/null 2>&1 &
+sleep 6
+FRONT=$(xdotool search --name 'front' 2>/dev/null | head -1)
+xdotool windowsize "$FRONT" 560 380 windowmove "$FRONT" 640 300 2>/dev/null; sleep 1
+timeout 120 wine "$BIN" --window --save "$(win "$T/shots/window.png")" >/dev/null 2>&1 &
+CLI=$!
+sleep 12
+check "A Window shows the window picker" yes "$(xdotool search --name 'choose the window' >/dev/null 2>&1 && echo yes || echo "no: $(xdotool search --name . getwindowname %@ 2>/dev/null | sort -u | tr '\n' '|')")"
+eval "$(xdotool getwindowgeometry --shell "$BACK" 2>/dev/null)"
+xdotool mousemove $((X + WIDTH / 2)) $((Y + HEIGHT / 2)); sleep 1
+import -window root /out/wine-window-picker.png
+xdotool click 1
+wait $CLI
 check "--window --save exits with 0" 0 $?
 SHOT=$(identify -format '%wx%h' "$T/shots/window.png" 2>/dev/null)
-eval "$(xdotool getwindowgeometry --shell "$NOTEPAD" 2>/dev/null)"
-echo "     Notepad is ${WIDTH:-?}x${HEIGHT:-?} on the screen, the capture $SHOT"
-check "the window capture is about Notepad's size" yes "$(python3 -c "
+echo "     the Notepad clicked is ${WIDTH:-?}x${HEIGHT:-?} on the screen, the capture $SHOT"
+check "the window capture is the Notepad clicked (not the one in front)" yes "$(python3 -c "
 w,h='$SHOT'.split('x'); print('yes' if abs(int(w)-${WIDTH:-0})<=40 and abs(int(h)-${HEIGHT:-0})<=60 else 'no')" 2>/dev/null || echo no)"
 cp "$T/shots/window.png" /out/wine-window.png 2>/dev/null
 wineserver -k 2>/dev/null; sleep 1

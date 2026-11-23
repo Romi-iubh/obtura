@@ -23,7 +23,7 @@ ImageMagick and tesseract.
    picture in `docs/screenshots/` before going on.
 5. **User guide**, if it or the screenshots changed: `docs/make-guide.sh`.
 6. **Tests:** `scripts/check.sh`, `scripts/test.sh`, and every smoke mode:
-   `for m in screen region edit annotate phase2 phase3 cli record; do scripts/smoke.sh tests/fixtures/sample.png $m || break; done`.
+   `for m in screen region edit annotate phase2 phase3 cli record scroll extras; do scripts/smoke.sh tests/fixtures/sample.png $m || break; done`.
 7. **Package:** `packaging/build-deb.sh` (builds and runs every test on Ubuntu 24.04 in
    Docker, writes `dist/obtura_X.Y.Z-1_amd64.deb`). Check it:
    `packaging/test-install.sh dist/obtura_X.Y.Z-1_amd64.deb` installs it in clean

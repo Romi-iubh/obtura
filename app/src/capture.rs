@@ -41,7 +41,7 @@ pub enum Mode {
     LastRegion,
     /// A part of the screen chosen on the overlay, then joined while the user scrolls it.
     Scrolling,
-    /// One window, picked in GNOME's list of windows (asked every time).
+    /// One window, picked in GNOME's list of windows (on Windows: clicked on the overlay), asked every time.
     Window,
 }
 
@@ -371,8 +371,12 @@ fn begin(app: &adw::Application, backend: Rc<dyn CaptureBackend>, request: Reque
     });
 }
 
-/// A window picked in GNOME's list: one frame of it, through screen sharing (no flash).
+/// A window picked in GNOME's list: one frame of it, through screen sharing (no flash). Where the
+/// system lists the windows itself (Windows), it is picked on the overlay instead.
 fn window(app: &adw::Application, backend: Rc<dyn CaptureBackend>, request: Request, hidden: Vec<gtk::Window>, settings: Settings, done: Done) {
+    if let Some(windows) = backend.windows() {
+        return pick_window(app, backend, windows, request, hidden, settings, done);
+    }
     let app = app.clone();
     backend.screencast(
         CastRequest { pointer: false, restore_token: None, windows: true },
@@ -391,6 +395,52 @@ fn window(app: &adw::Application, backend: Rc<dyn CaptureBackend>, request: Requ
             Err(e) => fail(&app, &request, &hidden, e, done),
         }),
     );
+}
+
+/// A window picked on the overlay (Windows): a still picture of the screen, the windows on it lit
+/// up under the pointer, and the one clicked cut from the picture as it is on the screen (as the
+/// Snipping Tool does).
+fn pick_window(app: &adw::Application, backend: Rc<dyn CaptureBackend>, windows: Vec<obtura_capture::Place>, request: Request, hidden: Vec<gtk::Window>, settings: Settings, done: Done) {
+    let app = app.clone();
+    backend.capture(
+        CaptureRequest { kind: CaptureKind::FullScreen },
+        Box::new(move |result| {
+            let picture = match result.and_then(|shot| decode_png(&shot.png).map_err(|e| CaptureError::Failed(e.to_string()))) {
+                Ok(p) => Rc::new(p),
+                Err(e) => return fail(&app, &request, &hidden, e, done),
+            };
+            let windows: Vec<obtura_capture::Place> = windows.into_iter().filter_map(|p| p.rect.clamp_to(picture.width, picture.height).map(|rect| obtura_capture::Place { rect, ..p })).collect();
+            if windows.is_empty() {
+                return fail(&app, &request, &hidden, CaptureError::Failed("There is no window to capture: open the window first, then choose A Window again.".into()), done);
+            }
+            let said = windows.iter().map(|p| (p.rect, window_said(&p.name, p.rect))).collect();
+            let slot = Rc::new(RefCell::new(Some((request, hidden, settings, done))));
+            let (app2, picture2, slot2) = (app.clone(), picture.clone(), slot.clone());
+            let shown = overlay::pick_window(
+                &picture,
+                said,
+                Box::new(move |chosen| {
+                    let Some((request, hidden, settings, done)) = slot2.borrow_mut().take() else { return };
+                    match chosen.and_then(|j| windows.get(j)).and_then(|p| picture2.crop(p.rect)) {
+                        Some(cropped) => deliver(&app2, cropped, &request, hidden, &settings, done),
+                        None => fail(&app2, &request, &hidden, CaptureError::Cancelled, done),
+                    }
+                }),
+            );
+            if let Err(why) = shown {
+                if let Some((request, hidden, _, done)) = slot.borrow_mut().take() {
+                    fail(&app, &request, &hidden, CaptureError::Failed(why), done);
+                }
+            }
+        }),
+    );
+}
+
+/// What the overlay says about a window: its title (shortened) and size.
+fn window_said(title: &str, r: obtura_image::Rect) -> String {
+    let title = title.trim();
+    let short: String = if title.chars().count() > 60 { format!("{}…", title.chars().take(59).collect::<String>()) } else { title.to_string() };
+    format!("{short}   {} × {}", r.w, r.h)
 }
 
 /// The region chosen last time, in pixels of the screen.
@@ -531,6 +581,8 @@ fn grab(app: &adw::Application, backend: Rc<dyn CaptureBackend>, request: Reques
         Box::new(move |result| {
             let decoded = result.and_then(|shot| decode_png(&shot.png).map_err(|e| CaptureError::Failed(e.to_string())));
             match decoded {
+                // Several screens: the one remembered, or the user says which (or all).
+                Ok(full) if request.mode == Mode::Screen => crate::screens::take(&app, b2, full, request, hidden, settings, done),
                 Ok(full) if request.mode == Mode::LastRegion => match last_region().and_then(|r| full.crop(r)) {
                     Some(cropped) => deliver(&app, cropped, &request, hidden, &settings, done),
                     // The last region is no longer on the screen: choose one on this picture.

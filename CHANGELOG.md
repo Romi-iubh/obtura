@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.2 (2026-11-23)
+
+- **Full Screen with several screens** (Ubuntu and Windows): Obtura asks the first time
+  which screen to keep, or all of them: the screen under the pointer lights up, a click
+  takes it, **All Screens** (or A) takes every screen in one picture. **Remember my
+  choice** (ticked) makes the next Full Screen captures take the same screen at once;
+  **Preferences › Behaviour › Full Screen** changes it (Ask Which Screen, All Screens, or
+  one screen). With one screen nothing changes.
+- **Windows: A Window lets you choose the window.** It used to take the window in front
+  without asking. Now the screen stands still and the window under the pointer lights up
+  with its name and size; a click captures it (Tab: the next window, Enter takes it, Esc
+  cancels). The desktop, the taskbar and click-through overlays are not offered.
+
 ## 0.9.1 (2026-11-23)
 
 - **Windows version** (Windows 10 and 11, 64-bit): an installer (for the current user, no
