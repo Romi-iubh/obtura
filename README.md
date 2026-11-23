@@ -1,8 +1,8 @@
 <h1 align="center">Obtura</h1>
 
 <p align="center"><b>Capture, annotate, redact and record your screen on Ubuntu.</b><br>
-A fast screenshot tool with an editor that needs no manual, for the GNOME desktop.
-Free and open source.</p>
+A fast screenshot tool with an editor that needs no manual, for the GNOME desktop,
+and for Windows 10 and 11. Free and open source.</p>
 
 ![The editor: a highlighted name, numbered steps, a pixelated card number and a callout, framed by Obtura's Beautify](docs/screenshots/hero.png)
 
@@ -52,17 +52,26 @@ internet, has no account and collects nothing.
 ## Install
 
 Obtura runs on **Ubuntu 24.04 LTS and newer** with the GNOME desktop, on 64-bit Intel and
-AMD computers. Download `obtura_0.9.0-1_amd64.deb` from the
+AMD computers. Download `obtura_0.9.1-1_amd64.deb` from the
 [releases page](https://github.com/Romi-iubh/obtura/releases/latest), then in a Terminal:
 
 ```
-sudo apt install ~/Downloads/obtura_0.9.0-1_amd64.deb
+sudo apt install ~/Downloads/obtura_0.9.1-1_amd64.deb
 ```
 
 apt also installs the programs Obtura uses for recording (GStreamer) and for reading
 text (Tesseract). For keys that work in every app (**Super+Shift+S** for a region),
 click **Use Super+Shift+S in Every App** in Obtura's start window. The
 [user guide](docs/user-guide.md) (also **F1** in Obtura) explains everything.
+
+### Windows
+
+Obtura also runs on **Windows 10 and 11** (64-bit): download `Obtura-0.9.1-setup.exe`
+and run it (installed for you only, no administrator rights needed), or unpack
+`Obtura-0.9.1-windows-x64.zip` and run `Obtura\bin\obtura.exe`. **Print Screen**
+captures a region from any app, and Obtura's icon by the clock offers the other
+captures. Screen recording is not in the Windows version yet. See
+[Obtura on Windows](docs/user-guide.md#18-obtura-on-windows) in the guide.
 
 ## Building from source
 
@@ -75,6 +84,8 @@ cargo run -p obtura
 
 `scripts/check.sh`, `scripts/test.sh` and `scripts/smoke.sh` check, test and try it
 headless; [docs/RELEASING.md](docs/RELEASING.md) makes the package.
+`packaging/windows/build-exe.sh` cross-compiles the Windows version in Docker (GTK from
+MSYS2, llvm-mingw) and `packaging/windows/test-exe.sh` tries it under Wine.
 
 ## Licence
 

@@ -132,13 +132,21 @@ fn about_dialog(app: &adw::Application) {
         "Other components",
         None,
         gtk::License::Custom,
-        Some(
+        Some(if cfg!(windows) {
+            "Obtura contains a number of Rust libraries (among them gtk-rs, image, png, gif and serde). \
+             Their copyright notices and licences are in the folder share\\doc\\obtura where Obtura is \
+             installed (THIRD-PARTY-LICENSES.txt).\n\n\
+             Obtura for Windows comes with GTK, libadwaita, GLib, cairo, Pango, Tesseract and the \
+             libraries they need, from the MSYS2 project, each under its own licence (most of them the \
+             GNU LGPL); the licences are in the folder share\\licenses, the list in \
+             share\\doc\\obtura\\WINDOWS-COMPONENTS.txt."
+        } else {
             "Obtura contains a number of Rust libraries (among them gtk-rs, image, png, gif and serde). \
              Their copyright notices and licences are in /usr/share/doc/obtura/copyright and \
              /usr/share/doc/obtura/THIRD-PARTY-LICENSES.txt.\n\n\
              Obtura uses the programs and libraries of this computer, which keep their own licences: \
-             GTK, libadwaita, cairo and Pango to draw, GStreamer to record and Tesseract to read text.",
-        ),
+             GTK, libadwaita, cairo and Pango to draw, GStreamer to record and Tesseract to read text."
+        }),
     );
     if let Some(notes) = release_notes() {
         d.set_release_notes_version(env!("CARGO_PKG_VERSION"));

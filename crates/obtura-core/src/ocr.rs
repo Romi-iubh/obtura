@@ -32,6 +32,7 @@ pub enum OcrError {
 impl std::fmt::Display for OcrError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            OcrError::Missing if cfg!(windows) => write!(f, "Text recognition needs tesseract.exe, installed with Obtura: install Obtura again"),
             OcrError::Missing => write!(f, "Text recognition needs the tesseract program. Install it with: sudo apt install tesseract-ocr"),
             OcrError::Failed(why) => write!(f, "Text recognition failed: {why}"),
         }
@@ -39,17 +40,29 @@ impl std::fmt::Display for OcrError {
 }
 
 /// The program, from the system (never a copy shadowing it elsewhere on the PATH).
-fn program() -> &'static str {
-    if std::path::Path::new("/usr/bin/tesseract").exists() {
-        "/usr/bin/tesseract"
-    } else {
-        "tesseract"
+#[cfg(unix)]
+fn command() -> Command {
+    Command::new(if std::path::Path::new("/usr/bin/tesseract").exists() { "/usr/bin/tesseract" } else { "tesseract" })
+}
+
+/// Windows: the copy installed with Obtura (beside `obtura.exe`, its languages in
+/// `..\share\tessdata`), started without a console window.
+#[cfg(windows)]
+fn command() -> Command {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let bin = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.to_path_buf())).unwrap_or_default();
+    let mut cmd = Command::new(bin.join("tesseract.exe"));
+    if let Some(prefix) = bin.parent() {
+        cmd.env("TESSDATA_PREFIX", prefix.join("share").join("tessdata"));
     }
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
 }
 
 /// The languages tesseract can read here (without its helper data "osd" and "equ").
 pub fn languages() -> Result<Vec<String>, OcrError> {
-    let out = Command::new(program()).arg("--list-langs").stdin(Stdio::null()).output().map_err(|_| OcrError::Missing)?;
+    let out = command().arg("--list-langs").stdin(Stdio::null()).output().map_err(|_| OcrError::Missing)?;
     let text = String::from_utf8_lossy(&out.stdout);
     Ok(text.lines().skip(1).map(str::trim).filter(|l| !l.is_empty() && *l != "osd" && *l != "equ").map(String::from).collect())
 }
@@ -80,7 +93,7 @@ pub fn recognize(picture: &Bitmap, langs: &str) -> Result<Vec<Word>, OcrError> {
     let k = if (picture.width as u64) * (picture.height as u64) <= ENLARGE_UP_TO { 2 } else { 1 };
     let input = if k == 1 { encode_png(picture) } else { encode_png(&resize(picture, picture.width * k, picture.height * k)) };
     let png = input.map_err(|e| OcrError::Failed(e.to_string()))?;
-    let mut cmd = Command::new(program());
+    let mut cmd = command();
     cmd.args(["stdin", "stdout", "--dpi", &(96 * k).to_string()]);
     if !langs.is_empty() {
         cmd.args(["-l", &langs]);

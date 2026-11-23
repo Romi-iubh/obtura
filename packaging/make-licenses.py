@@ -11,6 +11,10 @@ Cargo.lock changes:
 
     /usr/bin/python3 packaging/make-licenses.py
 
+It also writes packaging/windows/THIRD-PARTY-LICENSES.txt for the Windows build (the crates
+linked into obtura.exe; GTK and the other libraries that build ships are listed by the
+Windows build itself, in WINDOWS-COMPONENTS.txt).
+
 It reads the crates' sources from the local Cargo registry (run `cargo fetch` first).
 """
 import json
@@ -22,6 +26,9 @@ import textwrap
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT_COPYRIGHT = ROOT / "packaging" / "copyright"
 OUT_THIRD = ROOT / "packaging" / "THIRD-PARTY-LICENSES.txt"
+OUT_THIRD_WINDOWS = ROOT / "packaging" / "windows" / "THIRD-PARTY-LICENSES.txt"
+LINUX = "x86_64-unknown-linux-gnu"
+WINDOWS = "x86_64-pc-windows-gnullvm"
 WORKSPACE = {"obtura", "obtura-capture", "obtura-image", "obtura-scene", "obtura-render", "obtura-core"}
 RULE = "=" * 78
 
@@ -30,10 +37,10 @@ def cargo(*args):
     return subprocess.run(["cargo", *args], cwd=ROOT, check=True, capture_output=True, text=True).stdout
 
 
-def crates():
+def crates(target=LINUX):
     """(name, version, licence, licence files, authors) of every crate linked into obtura."""
     tree = cargo("tree", "-p", "obtura", "-e", "normal", "--prefix", "none", "--format", "{p}",
-                 "--target", "x86_64-unknown-linux-gnu", "--locked")
+                 "--target", target, "--locked")
     wanted = set()
     for line in tree.splitlines():
         m = re.match(r"(\S+) v(\S+)", line.strip())
@@ -85,24 +92,42 @@ def apache_text(crate_list):
     raise SystemExit("no Apache License 2.0 text found among the crates")
 
 
-def write_third_party(crate_list):
-    parts = [textwrap.dedent("""\
-        Obtura: third-party software and licences
-        {rule}
+LINUX_INTRO = """\
+    Obtura is free software under the GNU Affero General Public License, version 3
+    or later (see /usr/share/doc/obtura/copyright). Its source code is at
+    https://github.com/Romi-iubh/obtura (every release also has a source archive).
 
-        Obtura is free software under the GNU Affero General Public License, version 3
-        or later (see /usr/share/doc/obtura/copyright). Its source code is at
-        https://github.com/Romi-iubh/obtura (every release also has a source archive).
+    The Obtura program contains the Rust crates listed below. Each keeps its own
+    copyright and licence, reproduced here as those licences require. The source
+    code of every crate listed is published on https://crates.io under the same
+    name and version.
 
-        The Obtura program contains the Rust crates listed below. Each keeps its own
-        copyright and licence, reproduced here as those licences require. The source
-        code of every crate listed is published on https://crates.io under the same
-        name and version.
+    Obtura also uses libraries and programs of the system it is installed on (GTK,
+    libadwaita, GLib, cairo, Pango, GStreamer, Tesseract); they are not part of the
+    Obtura program and come with their own packages and licences.
+    """
 
-        Obtura also uses libraries and programs of the system it is installed on (GTK,
-        libadwaita, GLib, cairo, Pango, GStreamer, Tesseract); they are not part of the
-        Obtura program and come with their own packages and licences.
-        """).format(rule=RULE)]
+WINDOWS_INTRO = """\
+    Obtura is free software under the GNU Affero General Public License, version 3
+    or later (see LICENSE.txt in this folder). Its source code is at
+    https://github.com/Romi-iubh/obtura (every release also has a source archive).
+
+    The Obtura program (obtura.exe) contains the Rust crates listed below. Each keeps
+    its own copyright and licence, reproduced here as those licences require. The
+    source code of every crate listed is published on https://crates.io under the
+    same name and version.
+
+    Obtura for Windows also comes with GTK, libadwaita, GLib, cairo, Pango, Tesseract
+    and the libraries they need, as separate files (DLLs and programs) taken unchanged
+    from the MSYS2 project (https://www.msys2.org). WINDOWS-COMPONENTS.txt in this
+    folder lists each one with its version and licence; their licence texts are in
+    the folder share\\licenses, and their source code is published by MSYS2
+    (https://github.com/msys2/MINGW-packages) under the same names and versions.
+    """
+
+
+def write_third_party(crate_list, out=OUT_THIRD, intro=LINUX_INTRO):
+    parts = [f"Obtura: third-party software and licences\n{RULE}\n\n" + textwrap.dedent(intro)]
     parts.append(f"\n{RULE}\nRust crates\n{RULE}\n")
     # Crates whose licence texts are the same are listed together.
     groups = {}
@@ -116,7 +141,7 @@ def write_third_party(crate_list):
     for key, names in sorted(groups.items(), key=lambda kv: kv[1][0]):
         parts.append("\n--- " + "; ".join(names) + " ---\n\n" + key + "\n")
     parts.append(f"\n{RULE}\nThe Apache License, Version 2.0\n{RULE}\n\n{apache_text(crate_list)}\n")
-    OUT_THIRD.write_text("".join(parts))
+    out.write_text("".join(parts))
 
 
 def write_copyright():
@@ -161,9 +186,12 @@ def main():
     crate_list = crates()
     write_third_party(crate_list)
     write_copyright()
+    windows = crates(WINDOWS)
+    write_third_party(windows, OUT_THIRD_WINDOWS, WINDOWS_INTRO)
     licences = sorted({l for _, _, l, _, _ in crate_list})
     print(f"{len(crate_list)} crates; licences: {', '.join(licences)}")
     print(f"wrote {OUT_THIRD.relative_to(ROOT)} and {OUT_COPYRIGHT.relative_to(ROOT)}")
+    print(f"{len(windows)} crates for Windows; wrote {OUT_THIRD_WINDOWS.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

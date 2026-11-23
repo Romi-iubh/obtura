@@ -17,7 +17,7 @@ cat > "$WORK/cover.html" <<HTML
 <div class="cover">
 <img class="logo" src="file://$LOGO" alt="">
 <div class="title">Obtura User Guide</div>
-<div class="version">Version $VERSION · for Ubuntu 24.04 LTS and newer</div>
+<div class="version">Version $VERSION · for Ubuntu 24.04 LTS and newer, and Windows 10 and 11</div>
 </div>
 HTML
 

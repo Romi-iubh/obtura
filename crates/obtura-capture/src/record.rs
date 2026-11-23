@@ -8,11 +8,13 @@
 //! (`obtura_image::gif`). MP4 files are written in fragments, so even a recording cut short
 //! stays playable.
 
-use crate::{screencast::Sound, Cast, CaptureError};
+use crate::{
+    screencast::{Fd, Sound},
+    Cast, CaptureError,
+};
 use std::{
     cell::RefCell,
     ffi::OsStr,
-    os::fd::BorrowedFd,
     path::{Path, PathBuf},
     rc::Rc,
     time::Duration,
@@ -316,10 +318,7 @@ impl Segment {
         let sounds: Vec<Vec<String>> = if plan.format == Format::Gif { Vec::new() } else { plan.sounds.iter().map(|s| cast.sound_source(*s)).collect() };
         let args = pipeline(&videos, &sounds, plan, out, first_frame);
         let launcher = gio::SubprocessLauncher::new(gio::SubprocessFlags::STDERR_PIPE | gio::SubprocessFlags::STDOUT_SILENCE);
-        if let Some(fd) = fd {
-            // SAFETY: only names the descriptor number the program will see (3).
-            launcher.take_fd(fd, unsafe { BorrowedFd::borrow_raw(3) });
-        }
+        give_fd(&launcher, fd);
         let mut argv: Vec<&OsStr> = vec![GST_LAUNCH.as_ref(), "-e".as_ref(), "-q".as_ref()];
         argv.extend(args.iter().map(|s| OsStr::new(s.as_str())));
         let sub = launcher.spawn(&argv).map_err(|e| CaptureError::Failed(format!("cannot start {GST_LAUNCH}: {e}")))?;
@@ -338,13 +337,32 @@ impl Segment {
     /// has not ended after `grace`, it is killed (an MP4 written in fragments stays playable).
     pub fn stop(&self, grace: Duration) {
         *self.stopping.borrow_mut() = true;
+        #[cfg(unix)]
         self.sub.send_signal(2);
+        #[cfg(windows)]
+        self.sub.force_exit();
         let sub = self.sub.clone();
         gio::glib::timeout_add_local_once(grace, move || {
             if sub.identifier().is_some() {
                 sub.force_exit();
             }
         });
+    }
+}
+
+/// Gives the program `fd` as its descriptor 3.
+#[cfg(unix)]
+fn give_fd(launcher: &gio::SubprocessLauncher, fd: Option<Fd>) {
+    if let Some(fd) = fd {
+        // SAFETY: only names the descriptor number the program will see (3).
+        launcher.take_fd(fd, unsafe { std::os::fd::BorrowedFd::borrow_raw(3) });
+    }
+}
+
+#[cfg(windows)]
+fn give_fd(_launcher: &gio::SubprocessLauncher, fd: Option<Fd>) {
+    if let Some(fd) = fd {
+        match fd {}
     }
 }
 
@@ -399,14 +417,11 @@ pub fn run(args: Vec<String>, done: impl FnOnce(Result<(), String>) + 'static) {
 
 /// Runs `gst-launch-1.0` on `source` (ending in raw video, reading `fd` as descriptor 3 if
 /// given) for one frame, and gives that frame as PNG bytes. Gives up after 8 seconds.
-pub fn grab_png(source: Vec<String>, fd: Option<std::os::fd::OwnedFd>, done: impl FnOnce(Result<Vec<u8>, CaptureError>) + 'static) {
+pub fn grab_png(source: Vec<String>, fd: Option<Fd>, done: impl FnOnce(Result<Vec<u8>, CaptureError>) + 'static) {
     let mut args = source;
     args.extend(words("! videoconvert ! video/x-raw,format=RGBA ! pngenc compression-level=1 ! fdsink fd=1"));
     let launcher = gio::SubprocessLauncher::new(gio::SubprocessFlags::STDOUT_PIPE | gio::SubprocessFlags::STDERR_PIPE);
-    if let Some(fd) = fd {
-        // SAFETY: only names the descriptor number the program will see (3).
-        launcher.take_fd(fd, unsafe { BorrowedFd::borrow_raw(3) });
-    }
+    give_fd(&launcher, fd);
     let mut argv: Vec<&OsStr> = vec![GST_LAUNCH.as_ref(), "-q".as_ref()];
     argv.extend(args.iter().map(|s| OsStr::new(s.as_str())));
     let sub = match launcher.spawn(&argv) {

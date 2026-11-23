@@ -32,6 +32,7 @@ pub type Ended = Box<dyn FnOnce(Result<(), String>)>;
 /// The frames being taken.
 pub enum Frames {
     Program(Segment),
+    /// Taken by Obtura itself (the fake screen; the screen on Windows).
     Fake(Arc<AtomicBool>),
 }
 
@@ -47,6 +48,10 @@ impl Frames {
         if let Some(page) = cast.fake_page.clone() {
             let (w, h) = cast.streams.get(stream).and_then(|s| s.size).map(|(w, h)| (w as u32, h as u32)).unwrap_or((page.width, 400));
             return Ok(Frames::Fake(fake_frames(page, (w, h), crop, dir.to_path_buf(), ended)));
+        }
+        #[cfg(windows)]
+        if let Some(area) = cast.screen_area(stream) {
+            return Ok(Frames::Fake(screen_frames(area, crop, dir.to_path_buf(), ended)));
         }
         let plan = Plan { format: Format::Gif, crop: Some(crop), sounds: Vec::new(), gif_fps: FPS, gif_size: size, encoders: Encoders::default(), threads: 2, layout: Vec::new(), size: None };
         Segment::start(cast, &[stream], &plan, &dir.join("frame-%06d.png"), 0, ended).map(Frames::Program)
@@ -76,10 +81,28 @@ pub fn fake_view(page: &Bitmap, w: u32, h: u32, at: u32) -> Bitmap {
 /// The fake screen scrolling down through `page`, FPS frames a second, until stopped (it stays
 /// at the bottom of the page once there).
 fn fake_frames(page: Arc<Bitmap>, (w, h): (u32, u32), crop: Crop, dir: PathBuf, ended: Ended) -> Arc<AtomicBool> {
-    let stop = Arc::new(AtomicBool::new(false));
-    let s2 = stop.clone();
     let keep = Rect::new(crop.left as i32, crop.top as i32, w.saturating_sub(crop.left + crop.right), h.saturating_sub(crop.top + crop.bottom));
     let last = page.height.saturating_sub(h);
+    frames_from(move |n| Ok(fake_view(&page, w, h, (n * FAKE_STEP).min(last)).crop(keep).unwrap_or_else(|| Bitmap::filled(1, 1, [0; 4]))), dir, ended)
+}
+
+/// Windows: the part `crop` of `area` of the screen, read FPS times a second.
+#[cfg(windows)]
+fn screen_frames(area: crate::windows::Area, crop: Crop, dir: PathBuf, ended: Ended) -> Arc<AtomicBool> {
+    let part = crate::windows::Area {
+        x: area.x + crop.left as i32,
+        y: area.y + crop.top as i32,
+        width: area.width.saturating_sub(crop.left + crop.right),
+        height: area.height.saturating_sub(crop.top + crop.bottom),
+    };
+    frames_from(move |_| crate::windows::grab(part), dir, ended)
+}
+
+/// Writes the frames `take` gives (frame number in, picture out), FPS a second, into `dir`
+/// until stopped, on a thread of its own.
+fn frames_from(mut take: impl FnMut(u32) -> Result<Bitmap, String> + Send + 'static, dir: PathBuf, ended: Ended) -> Arc<AtomicBool> {
+    let stop = Arc::new(AtomicBool::new(false));
+    let s2 = stop.clone();
     let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
     std::thread::spawn(move || {
         let mut n = 0u32;
@@ -89,9 +112,7 @@ fn fake_frames(page: Arc<Bitmap>, (w, h): (u32, u32), crop: Crop, dir: PathBuf, 
                 break Ok(());
             }
             let t0 = std::time::Instant::now();
-            let at = (n * FAKE_STEP).min(last);
-            let frame = fake_view(&page, w, h, at).crop(keep).unwrap_or_else(|| Bitmap::filled(1, 1, [0; 4]));
-            let written = encode_png(&frame).map_err(|e| e.to_string()).and_then(|png| {
+            let written = take(n).and_then(|frame| encode_png(&frame).map_err(|e| e.to_string())).and_then(|png| {
                 let tmp = dir.join(format!("frame-{n:06}.tmp"));
                 std::fs::write(&tmp, png).map_err(|e| e.to_string())?;
                 std::fs::rename(&tmp, frame_path(&dir, n)).map_err(|e| e.to_string())

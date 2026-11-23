@@ -3,7 +3,8 @@
 //! double-click or Escape to close it, right-click for the menu.
 //!
 //! GNOME on Wayland does not let a program put its own window above the others: the menu
-//! tells how to (Alt+Space, then "Always on Top", GNOME's own window menu).
+//! tells how to (Alt+Space, then "Always on Top", GNOME's own window menu). On Windows the pin
+//! keeps itself above the other windows, and its menu can let it go back among them.
 
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
@@ -96,6 +97,10 @@ pub fn open(app: &adw::Application, image: &Bitmap) -> gtk::Window {
         let menu = menu.clone();
         win.connect_destroy(move |_| menu.unparent());
     }
+    #[cfg(windows)]
+    win.connect_map(|w| {
+        crate::win32::keep_on_top(w, true);
+    });
     win.present();
     win
 }
@@ -125,8 +130,24 @@ fn menu_for(win: &gtk::Window, image: Bitmap) -> gtk::PopoverMenu {
         close.connect_activate(move |_, _| win.close());
     }
     group.add_action(&close);
-    let on_top = gio::SimpleAction::new("on-top", None);
-    on_top.set_enabled(false);
+    #[cfg(not(windows))]
+    let on_top = {
+        let a = gio::SimpleAction::new("on-top", None);
+        a.set_enabled(false);
+        a
+    };
+    #[cfg(windows)]
+    let on_top = {
+        let a = gio::SimpleAction::new_stateful("on-top", None, &true.to_variant());
+        let win = win.clone();
+        a.connect_change_state(move |a, v| {
+            if let Some(on) = v.and_then(|v| v.get::<bool>()) {
+                crate::win32::keep_on_top(&win, on);
+                a.set_state(&on.to_variant());
+            }
+        });
+        a
+    };
     group.add_action(&on_top);
     win.insert_action_group("pin", Some(&group));
 
@@ -136,7 +157,8 @@ fn menu_for(win: &gtk::Window, image: Bitmap) -> gtk::PopoverMenu {
     main.append(Some("See Through"), Some("pin.fade"));
     model.append_section(None, &main);
     let hint = gio::Menu::new();
-    hint.append(Some("To keep it above other windows: Alt+Space, then Always on Top"), Some("pin.on-top"));
+    let on_top_label = if cfg!(windows) { "Keep Above Other Windows" } else { "To keep it above other windows: Alt+Space, then Always on Top" };
+    hint.append(Some(on_top_label), Some("pin.on-top"));
     model.append_section(None, &hint);
     let end = gio::Menu::new();
     end.append(Some("Close"), Some("pin.close"));

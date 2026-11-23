@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.9.1 (2026-11-23)
+
+- **Windows version** (Windows 10 and 11, 64-bit): an installer (for the current user, no
+  administrator rights) and a zip to run without installing, cross-compiled with GTK and
+  libadwaita from MSYS2. Screenshots are read from the screen directly (no question, no
+  flash); Print Screen, Shift+Print Screen and Ctrl+Print Screen work in every app;
+  Obtura's icon in the notification area offers the captures; "A Window" takes the window
+  in front; scrolling capture, text reading (Tesseract included, English), QR codes, the
+  editor, pins (kept above other windows), the library. Screen recording is not in the
+  Windows version yet.
+- Windows: Obtura draws with the processor (GTK's Cairo renderer) instead of OpenGL: it
+  stopped at start inside an NVIDIA OpenGL driver.
+- Windows: in the Formatting and Beautify panels, the colour chooser picked a colour only
+  on the second click (the first one closed the panel and left the chooser alone on the
+  screen). The panel now closes while the chooser is open and comes back after; the same
+  for the font chooser and Beautify's background picture.
+- Editor: a mark below a blur, pixelate, box or magnifier kept its old look on the screen
+  when it was resized by its handles, turned or bent, until something else changed (the
+  saved picture was right). The view now follows at once.
+
 ## 0.9.0 (2026-11-18)
 
 The first package: the release candidate for 1.0.

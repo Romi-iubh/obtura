@@ -63,7 +63,10 @@ pub fn show(app: &adw::Application) {
     let behaviour = adw::PreferencesGroup::builder().title("Behaviour").build();
     behaviour.add(&switch_row(&settings, &dialog, "Copy to the clipboard after a capture", "The picture is on the clipboard the moment it is taken, ready to paste anywhere.", |s| s.copy_after_capture, |s, v| s.copy_after_capture = v));
     behaviour.add(&switch_row(&settings, &dialog, "Keep running in the background", "Makes the next capture instant. Nothing is sent anywhere; Obtura just stays loaded.", |s| s.keep_running, |s, v| s.keep_running = v));
-    behaviour.add(&switch_row(&settings, &dialog, "Use screen sharing (no white flash)", "Recommended. Turned off, Obtura uses GNOME's screenshot service instead, and the screen flashes white at each screenshot.", |s| s.quiet_capture, |s, v| s.quiet_capture = v));
+    // GNOME only: Windows takes screenshots without a flash or a question.
+    if !cfg!(windows) {
+        behaviour.add(&switch_row(&settings, &dialog, "Use screen sharing (no white flash)", "Recommended. Turned off, Obtura uses GNOME's screenshot service instead, and the screen flashes white at each screenshot.", |s| s.quiet_capture, |s, v| s.quiet_capture = v));
+    }
     let screens = adw::ActionRow::builder().title("Screens Obtura may see").subtitle("GNOME asked once and remembers. Choose again to add a screen.").build();
     let again = gtk::Button::builder().label("Choose Again").valign(gtk::Align::Center).sensitive(obtura_core::screen_share::load().is_some()).build();
     {
@@ -75,13 +78,18 @@ pub fn show(app: &adw::Application) {
         });
     }
     screens.add_suffix(&again);
-    behaviour.add(&screens);
+    if !cfg!(windows) {
+        behaviour.add(&screens);
+    }
     page.add(&behaviour);
 
     // --- Library ---
     let library = adw::PreferencesGroup::builder()
         .title("Library")
-        .description("Every screenshot is kept as it was taken (before any blur), on this computer only, in ~/.local/share/obtura/library. Open it with Ctrl+L.")
+        .description(format!(
+            "Every screenshot is kept as it was taken (before any blur), on this computer only, in {}. Open it with Ctrl+L.",
+            if cfg!(windows) { obtura_core::paths::data_dir().join("library").display().to_string() } else { "~/.local/share/obtura/library".to_string() }
+        ))
         .build();
     library.add(&switch_row(&settings, &dialog, "Keep every screenshot", "Turned off, new screenshots are not kept; those already there stay until you delete them.", |s| s.history, |s, v| s.history = v));
     library.add(&switch_row(&settings, &dialog, "Read the text of each screenshot", "So you can find a screenshot by the words in it. Done on this computer, in the background.", |s| s.history_text, |s, v| s.history_text = v));
@@ -113,7 +121,14 @@ pub fn show(app: &adw::Application) {
     }
     reading.add(&langs);
     let about = match &installed {
+        // Windows: English comes with Obtura; other languages are files put in its folder.
+        Ok(list) if !list.is_empty() && cfg!(windows) => format!(
+            "Installed: {}. Write them joined by + (for example eng+fra). More languages: put their .traineddata files (github.com/tesseract-ocr/tessdata) in {}.",
+            list.join(", "),
+            std::env::current_exe().ok().and_then(|p| Some(p.parent()?.parent()?.join("share").join("tessdata").display().to_string())).unwrap_or_else(|| "share\\tessdata".into())
+        ),
         Ok(list) if !list.is_empty() => format!("Installed: {}. Write them joined by + (for example eng+fra). More languages: sudo apt install tesseract-ocr-fra (and so on).", list.join(", ")),
+        Ok(_) | Err(_) if cfg!(windows) => obtura_core::ocr::OcrError::Missing.to_string(),
         Ok(_) => "No language is installed for the tesseract program. Install one: sudo apt install tesseract-ocr-eng".to_string(),
         Err(_) => "Text reading needs the tesseract program: sudo apt install tesseract-ocr".to_string(),
     };
@@ -168,13 +183,20 @@ pub fn show(app: &adw::Application) {
         });
     }
     recording.add(&rec_template);
-    page.add(&recording);
+    // Recording is not in the Windows version yet.
+    if !cfg!(windows) {
+        page.add(&recording);
+    }
 
     // --- Keys that work in every app ---
     if crate::global_keys::available() {
         let everywhere = adw::PreferencesGroup::builder()
             .title("Keys that work in every app")
-            .description("Obtura's own keys (Ctrl+Shift+R and the others) work only while an Obtura window is in front. These work everywhere, even when Obtura is closed.")
+            .description(if cfg!(windows) {
+                "Obtura's own keys (Ctrl+Shift+R and the others) work only while an Obtura window is in front. These work in every app; Obtura then stays running, its icon in the notification area."
+            } else {
+                "Obtura's own keys (Ctrl+Shift+R and the others) work only while an Obtura window is in front. These work everywhere, even when Obtura is closed."
+            })
             .build();
         let keys_row = adw::SwitchRow::builder().title("Keys in every app").active(crate::global_keys::enabled()).build();
         let describe = {
@@ -186,7 +208,8 @@ pub fn show(app: &adw::Application) {
                 } else {
                     on.iter().map(|(what, key)| format!("{key}: {what}")).collect::<Vec<_>>().join("\n")
                 };
-                keys_row.set_subtitle(&format!("{text}\nAdded to GNOME's keyboard shortcuts, where they can be changed."));
+                let where_ = if cfg!(windows) { "Windows gives them to Obtura while it runs." } else { "Added to GNOME's keyboard shortcuts, where they can be changed." };
+                keys_row.set_subtitle(&format!("{text}\n{where_}"));
             }
         };
         describe();
@@ -201,7 +224,7 @@ pub fn show(app: &adw::Application) {
                     }
                     Err(e) => {
                         obtura_core::log::error(&format!("keyboard shortcuts: {e}"));
-                        dialog.add_toast(adw::Toast::new(&format!("Could not change GNOME's shortcuts: {e}")));
+                        dialog.add_toast(adw::Toast::new(&format!("Could not change the keys: {e}")));
                     }
                 }
                 describe();
@@ -214,8 +237,14 @@ pub fn show(app: &adw::Application) {
     // --- Other commands ---
     let keys = adw::PreferencesGroup::builder()
         .title("Other keys")
-        .description("To give another command a key of its own, add a custom shortcut: open Settings › Keyboard › View and Customize Shortcuts › Custom Shortcuts, press +, give it a name, paste one of these commands, and press the key you want.")
+        .description(if cfg!(windows) {
+            "To give another command a key of its own, make a shortcut to it: right-click the desktop › New › Shortcut, paste one of these commands, give it a name; then in the shortcut's Properties click Shortcut key and press the key you want."
+        } else {
+            "To give another command a key of its own, add a custom shortcut: open Settings › Keyboard › View and Customize Shortcuts › Custom Shortcuts, press +, give it a name, paste one of these commands, and press the key you want."
+        })
         .build();
+    // Windows: the full path of obtura.exe (no program folder on the PATH).
+    let program = if cfg!(windows) { std::env::current_exe().map(|p| format!("\"{}\"", p.display())).unwrap_or_else(|_| "obtura".into()) } else { "obtura".to_string() };
     for (title, command) in [
         ("Capture a region", "obtura --region"),
         ("Capture the whole screen", "obtura --screen"),
@@ -229,7 +258,11 @@ pub fn show(app: &adw::Application) {
         ("Record a screen (press again to stop)", "obtura --record --screen"),
         ("Record a window (press again to stop)", "obtura --record --window"),
     ] {
-        keys.add(&command_row(title, command, &dialog));
+        if cfg!(windows) && command.contains("--record") {
+            continue;
+        }
+        let command = command.replacen("obtura", &program, 1);
+        keys.add(&command_row(title, &command, &dialog));
     }
     page.add(&keys);
 
@@ -307,8 +340,10 @@ pub fn shortcuts(app: &adw::Application) {
         let rows: Vec<(&str, String)> = everywhere.iter().map(|(what, key)| (*what, key.clone())).collect();
         group("In every app", &rows);
     }
-    group("Capture", &[("Select a region", s("Ctrl+Shift+R")), ("Whole screen", s("Ctrl+Shift+F")), ("Copy the text of a region", s("Ctrl+Shift+T")), ("New screenshot from the editor", s("Ctrl+N")), ("Same region again, from the editor", s("Ctrl+Shift+N")), ("Scrolling capture: finish", s("Obtura's icon in the top bar")), ("Library", s("Ctrl+L"))]);
-    group("Recording", &[("Record the screen", s("Ctrl+Shift+E")), ("Pause", s("Click Obtura's icon")), ("Stop and save", s("Top-bar sharing icon")), ("Start or stop from anywhere", s("obtura --record"))]);
+    group("Capture", &[("Select a region", s("Ctrl+Shift+R")), ("Whole screen", s("Ctrl+Shift+F")), ("Copy the text of a region", s("Ctrl+Shift+T")), ("New screenshot from the editor", s("Ctrl+N")), ("Same region again, from the editor", s("Ctrl+Shift+N")), ("Scrolling capture: finish", s(if cfg!(windows) { "Print Screen, or Obtura's icon by the clock" } else { "Obtura's icon in the top bar" })), ("Library", s("Ctrl+L"))]);
+    if !cfg!(windows) {
+        group("Recording", &[("Record the screen", s("Ctrl+Shift+E")), ("Pause", s("Click Obtura's icon")), ("Stop and save", s("Top-bar sharing icon")), ("Start or stop from anywhere", s("obtura --record"))]);
+    }
     let tools: Vec<(&str, String)> = crate::tools::ALL.iter().map(|t| (t.name(), t.key().to_string())).collect();
     group("Tools", &tools);
     group(

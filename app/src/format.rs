@@ -7,10 +7,10 @@ use crate::{
     editor::{Change, Editor},
     tools::{Fields, Slot},
 };
-use gtk::{cairo, gdk, prelude::*};
+use gtk::{cairo, gdk, glib, prelude::*};
 use obtura_render::draw_objects;
 use obtura_scene::{Cap, Color, Dash, Kind, Object, Point, Shape, Style, CAPS, FONTS};
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, rc::Rc, time::Duration};
 
 const PALETTE: [&str; 8] = ["#e01b24", "#ff7800", "#f5c211", "#33d17a", "#3584e4", "#9141ac", "#ffffff", "#000000"];
 
@@ -460,13 +460,14 @@ impl Panel {
             let (ed, family) = (self.editor.clone(), family.clone());
             Rc::new(move || {
                 let dialog = gtk::FontDialog::builder().title("Choose a Font").build();
-                let parent = family.root().and_downcast::<gtk::Window>();
+                let (parent, back) = leave_popover(&family);
                 let ed = ed.clone();
                 dialog.choose_family(parent.as_ref(), None::<&gtk::pango::FontFamily>, gtk::gio::Cancellable::NONE, move |result| {
                     if let Ok(f) = result {
                         let name = obtura_scene::FamilyName::new(&f.name());
                         ed.apply_style(|st| st.font = obtura_scene::Font::Family(name));
                     }
+                    back();
                 });
             })
         };
@@ -522,27 +523,17 @@ impl Panel {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         let title = gtk::Label::builder().hexpand(true).halign(gtk::Align::Start).build();
         row.append(&title);
-        let dialog = gtk::ColorDialog::new();
-        dialog.set_with_alpha(fill);
-        let button = gtk::ColorDialogButton::new(Some(dialog));
+        let set = Rc::new(set);
+        let button = {
+            let (ed, set) = (self.editor.clone(), set.clone());
+            ColourButton::new(fill, move |color| ed.apply_style(|st| set(st, color)))
+        };
         let none = gtk::CheckButton::with_label("None");
         if fill {
             row.append(&none);
         }
-        row.append(&button);
+        row.append(&button.button);
         into.append(&row);
-        let set = Rc::new(set);
-        {
-            let (ed, sy, set) = (self.editor.clone(), self.syncing.clone(), set.clone());
-            button.connect_rgba_notify(move |b| {
-                if !sy.get() {
-                    let c = b.rgba();
-                    let to8 = |v: f32| (v * 255.0).round().clamp(0.0, 255.0) as u8;
-                    let color = Color { r: to8(c.red()), g: to8(c.green()), b: to8(c.blue()), a: to8(c.alpha()) };
-                    ed.apply_style(|st| set(st, color));
-                }
-            });
-        }
         if fill {
             let (ed, sy, set, button) = (self.editor.clone(), self.syncing.clone(), set, button.clone());
             none.connect_toggled(move |n| {
@@ -550,9 +541,7 @@ impl Panel {
                     if n.is_active() {
                         ed.apply_style(|st| st.fill = None);
                     } else {
-                        let c = button.rgba();
-                        let to8 = |v: f32| (v * 255.0).round().clamp(0.0, 255.0) as u8;
-                        let color = Color { r: to8(c.red()), g: to8(c.green()), b: to8(c.blue()), a: to8(c.alpha()) };
+                        let color = button.color();
                         ed.apply_style(|st| set(st, color));
                     }
                 }
@@ -563,15 +552,143 @@ impl Panel {
             row.set_visible(name.is_some());
             if let Some(n) = name {
                 title.set_label(n);
-                let c = get(s);
-                button.set_rgba(&gdk::RGBA::new(c.r as f32 / 255.0, c.g as f32 / 255.0, c.b as f32 / 255.0, c.a as f32 / 255.0));
+                button.set_color(get(s));
                 if fill {
                     none.set_active(s.fill.is_none());
-                    button.set_sensitive(s.fill.is_some());
+                    button.button.set_sensitive(s.fill.is_some());
                 }
             }
         });
     }
+}
+
+/// A button showing a colour; a click opens the full colour chooser (GTK's colour dialog) on
+/// the window. `on_chosen` runs with the colour the user picked, never for [`set_color`](Self::set_color).
+///
+/// Used in place of GTK's `ColorDialogButton` for the Formatting and Beautify panels: on
+/// Windows a panel (a popover) left open under the chooser kept hold of the pointer, so the
+/// first click on a colour only closed the panel, the chooser stayed alone on the screen and
+/// a second click was needed. See [`leave_popover`].
+#[derive(Clone)]
+pub struct ColourButton {
+    pub button: gtk::Button,
+    color: Rc<Cell<Color>>,
+    swatch: gtk::DrawingArea,
+}
+
+impl ColourButton {
+    /// `with_alpha`: the chooser also offers transparency.
+    pub fn new(with_alpha: bool, on_chosen: impl Fn(Color) + 'static) -> Self {
+        let color = Rc::new(Cell::new(Color::WHITE));
+        let swatch = gtk::DrawingArea::builder().content_width(28).content_height(18).build();
+        {
+            let color = color.clone();
+            swatch.set_draw_func(move |_, cr, w, h| paint_swatch(cr, w as f64, h as f64, color.get()));
+        }
+        let button = gtk::Button::builder().child(&swatch).css_classes(["color"]).tooltip_text("Choose a colour").build();
+        let on_chosen: Rc<dyn Fn(Color)> = Rc::new(on_chosen);
+        {
+            let (color, swatch) = (color.clone(), swatch.clone());
+            button.connect_clicked(move |b| {
+                let dialog = gtk::ColorDialog::builder().with_alpha(with_alpha).modal(true).build();
+                let initial = rgba_of(color.get());
+                let (parent, back) = leave_popover(b);
+                let (color, swatch, on_chosen) = (color.clone(), swatch.clone(), on_chosen.clone());
+                dialog.choose_rgba(parent.as_ref(), Some(&initial), gtk::gio::Cancellable::NONE, move |result| {
+                    if let Ok(c) = result {
+                        let c = color_of(&c);
+                        color.set(c);
+                        swatch.queue_draw();
+                        on_chosen(c);
+                    }
+                    back();
+                });
+            });
+        }
+        Self { button, color, swatch }
+    }
+
+    pub fn color(&self) -> Color {
+        self.color.get()
+    }
+
+    pub fn set_color(&self, c: Color) {
+        if self.color.replace(c) != c {
+            self.swatch.queue_draw();
+        }
+    }
+}
+
+/// Before a dialog opens from inside a popover (the Formatting or Beautify panel): the window
+/// to put the dialog on, and what to call once the dialog is done.
+///
+/// Windows: the popover is closed first and opened again after (with the same things shown:
+/// "More formatting" stays open). A popover holds the pointer while it is open, and under
+/// Windows it took the first click made in the dialog to close itself. On Linux nothing
+/// changes: GNOME gives the dialog its clicks.
+pub fn leave_popover(widget: &impl IsA<gtk::Widget>) -> (Option<gtk::Window>, Box<dyn FnOnce()>) {
+    let parent = widget.root().and_downcast::<gtk::Window>();
+    let popover = widget.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().filter(|_| cfg!(windows));
+    let Some(popover) = popover else { return (parent, Box::new(|| {})) };
+    popover.popdown();
+    let back = move || {
+        // A moment later, once Windows has given the window its focus back.
+        glib::timeout_add_local_once(Duration::from_millis(150), move || {
+            // Not if its window was closed meanwhile.
+            if !popover.root().is_some_and(|r| r.is_visible()) {
+                return;
+            }
+            match popover.parent().and_downcast::<gtk::MenuButton>() {
+                Some(button) => button.popup(),
+                None => popover.popup(),
+            }
+        });
+    };
+    (parent, Box::new(back))
+}
+
+fn color_of(c: &gdk::RGBA) -> Color {
+    let to8 = |v: f32| (v * 255.0).round().clamp(0.0, 255.0) as u8;
+    Color { r: to8(c.red()), g: to8(c.green()), b: to8(c.blue()), a: to8(c.alpha()) }
+}
+
+fn rgba_of(c: Color) -> gdk::RGBA {
+    gdk::RGBA::new(c.r as f32 / 255.0, c.g as f32 / 255.0, c.b as f32 / 255.0, c.a as f32 / 255.0)
+}
+
+/// A colour button's face: a rounded rectangle of the colour, over a checkerboard when it is
+/// see-through.
+fn paint_swatch(cr: &cairo::Context, w: f64, h: f64, c: Color) {
+    let r = 3.0;
+    let q = std::f64::consts::FRAC_PI_2;
+    let outline = || {
+        cr.new_sub_path();
+        cr.arc(w - r - 0.5, r + 0.5, r, -q, 0.0);
+        cr.arc(w - r - 0.5, h - r - 0.5, r, 0.0, q);
+        cr.arc(r + 0.5, h - r - 0.5, r, q, 2.0 * q);
+        cr.arc(r + 0.5, r + 0.5, r, 2.0 * q, 3.0 * q);
+        cr.close_path();
+    };
+    let _ = cr.save();
+    outline();
+    cr.clip();
+    if c.a < 255 {
+        for y in 0..(h as i32 / 5 + 1) {
+            for x in 0..(w as i32 / 5 + 1) {
+                let v = if (x + y) % 2 == 0 { 0.95 } else { 0.7 };
+                cr.set_source_rgb(v, v, v);
+                cr.rectangle(x as f64 * 5.0, y as f64 * 5.0, 5.0, 5.0);
+                let _ = cr.fill();
+            }
+        }
+    }
+    cr.set_source_rgba(c.r as f64 / 255.0, c.g as f64 / 255.0, c.b as f64 / 255.0, c.a as f64 / 255.0);
+    let _ = cr.paint();
+    let _ = cr.restore();
+    outline();
+    cr.set_source_rgba(0.5, 0.5, 0.5, 0.6);
+    cr.set_line_width(1.0);
+    let _ = cr.stroke();
 }
 
 fn caption(text: &str) -> gtk::Label {

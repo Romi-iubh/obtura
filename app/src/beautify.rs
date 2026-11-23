@@ -2,8 +2,11 @@
 //! picture, padding, corners, shadow, border, window bar, device, torn edge, size ratio), in
 //! one popover. One click on a preset turns it on.
 
-use crate::editor::{Change, Editor};
-use gtk::{cairo, gdk, prelude::*};
+use crate::{
+    editor::{Change, Editor},
+    format::{leave_popover, ColourButton},
+};
+use gtk::{cairo, prelude::*};
 use obtura_scene::{Background, Bar, Color, Device, Frame};
 use std::{cell::Cell, rc::Rc};
 
@@ -107,39 +110,37 @@ pub fn build(editor: &Rc<Editor>) -> gtk::MenuButton {
     // Own colours: one colour, or two for a gradient.
     let own = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     own.append(&gtk::Label::builder().label("Own colours").hexpand(true).halign(gtk::Align::Start).build());
-    let from = gtk::ColorDialogButton::new(Some(gtk::ColorDialog::new()));
-    let to = gtk::ColorDialogButton::new(Some(gtk::ColorDialog::new()));
-    from.set_tooltip_text(Some("Top-left colour"));
-    to.set_tooltip_text(Some("Bottom-right colour (the same for a plain background)"));
-    own.append(&from);
-    own.append(&to);
+    // Both colours make the background: one plain colour, or a gradient from the first to
+    // the second.
+    let pair = Rc::new(Cell::new((Color::WHITE, Color::WHITE)));
+    let pick = {
+        let (ed, pair) = (editor.clone(), pair.clone());
+        Rc::new(move |first: Option<Color>, second: Option<Color>| {
+            let (a, b) = pair.get();
+            let (a, b) = (first.unwrap_or(a), second.unwrap_or(b));
+            Panel::change(&ed, |f| f.background = if a == b { Background::Solid(a) } else { Background::Gradient(a, b) });
+        })
+    };
+    let from = {
+        let pick = pick.clone();
+        ColourButton::new(false, move |c| pick(Some(c), None))
+    };
+    let to = ColourButton::new(false, move |c| pick(None, Some(c)));
+    from.button.set_tooltip_text(Some("Top-left colour"));
+    to.button.set_tooltip_text(Some("Bottom-right colour (the same for a plain background)"));
+    own.append(&from.button);
+    own.append(&to.button);
     content.append(&own);
-    {
-        let pick = {
-            let (ed, sy, from, to) = (editor.clone(), p.syncing.clone(), from.clone(), to.clone());
-            move || {
-                if sy.get() {
-                    return;
-                }
-                let (a, b) = (color_of(&from.rgba()), color_of(&to.rgba()));
-                Panel::change(&ed, |f| f.background = if a == b { Background::Solid(a) } else { Background::Gradient(a, b) });
-            }
+    p.syncs.push(Box::new(move |f| {
+        let (a, b) = match f.map(|f| f.background) {
+            Some(Background::Solid(c)) => (c, c),
+            Some(Background::Gradient(a, b)) => (a, b),
+            _ => (Color::WHITE, Color::WHITE),
         };
-        let pick = Rc::new(pick);
-        let p1 = pick.clone();
-        from.connect_rgba_notify(move |_| p1());
-        to.connect_rgba_notify(move |_| pick());
-        let (from, to) = (from.clone(), to.clone());
-        p.syncs.push(Box::new(move |f| {
-            let (a, b) = match f.map(|f| f.background) {
-                Some(Background::Solid(c)) => (c, c),
-                Some(Background::Gradient(a, b)) => (a, b),
-                _ => (Color::WHITE, Color::WHITE),
-            };
-            from.set_rgba(&rgba_of(a));
-            to.set_rgba(&rgba_of(b));
-        }));
-    }
+        pair.set((a, b));
+        from.set_color(a);
+        to.set_color(b);
+    }));
 
     p.slider(&content, "Space around (padding)", 200.0, |f| f.padding, |f, v| f.padding = v);
     p.slider(&content, "Rounded corners", 48.0, |f| f.corner, |f, v| f.corner = v);
@@ -147,27 +148,23 @@ pub fn build(editor: &Rc<Editor>) -> gtk::MenuButton {
     p.slider(&content, "Border", 16.0, |f| f.border, |f, v| f.border = v);
     let border_colour = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     border_colour.append(&gtk::Label::builder().label("Border colour").hexpand(true).halign(gtk::Align::Start).build());
-    let border_button = gtk::ColorDialogButton::new(Some(gtk::ColorDialog::new()));
-    border_colour.append(&border_button);
+    let border_button = {
+        let ed = editor.clone();
+        ColourButton::new(false, move |c| {
+            Panel::change(&ed, |f| {
+                f.border_color = c;
+                if f.border <= 0.0 {
+                    f.border = 2.0;
+                }
+            })
+        })
+    };
+    border_colour.append(&border_button.button);
     content.append(&border_colour);
-    {
-        let (ed, sy) = (editor.clone(), p.syncing.clone());
-        border_button.connect_rgba_notify(move |b| {
-            if !sy.get() {
-                let c = color_of(&b.rgba());
-                Panel::change(&ed, |f| {
-                    f.border_color = c;
-                    if f.border <= 0.0 {
-                        f.border = 2.0;
-                    }
-                });
-            }
-        });
-        p.syncs.push(Box::new(move |f| {
-            border_colour.set_sensitive(f.is_some());
-            border_button.set_rgba(&rgba_of(f.copied().unwrap_or_default().border_color));
-        }));
-    }
+    p.syncs.push(Box::new(move |f| {
+        border_colour.set_sensitive(f.is_some());
+        border_button.set_color(f.copied().unwrap_or_default().border_color);
+    }));
 
     // A picture of your own as the background.
     let picture_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -180,9 +177,11 @@ pub fn build(editor: &Rc<Editor>) -> gtk::MenuButton {
     {
         let ed = editor.clone();
         choose_picture.connect_clicked(move |b| {
-            let parent = b.root().and_downcast::<gtk::Window>();
+            let (parent, back) = leave_popover(b);
             let ed = ed.clone();
             crate::modules::choose_picture_file(parent.as_ref(), move |picture| {
+                back();
+                let Some(picture) = picture else { return };
                 let ed = ed.clone();
                 gtk::glib::spawn_future_local(async move {
                     // Kept in Obtura's picture store (made smaller if huge), off the main thread.
@@ -390,15 +389,6 @@ fn caption(text: &str) -> gtk::Label {
     gtk::Label::builder().label(text).halign(gtk::Align::Start).css_classes(["caption-heading"]).build()
 }
 
-fn color_of(c: &gdk::RGBA) -> Color {
-    let to8 = |v: f32| (v * 255.0).round().clamp(0.0, 255.0) as u8;
-    Color { r: to8(c.red()), g: to8(c.green()), b: to8(c.blue()), a: to8(c.alpha()) }
-}
-
-fn rgba_of(c: Color) -> gdk::RGBA {
-    gdk::RGBA::new(c.r as f32 / 255.0, c.g as f32 / 255.0, c.b as f32 / 255.0, c.a as f32 / 255.0)
-}
-
 /// A swatch of a background: a rounded rectangle; a checkerboard for "transparent".
 fn paint_background(cr: &cairo::Context, w: f64, h: f64, bg: Background) {
     let r = 5.0;
@@ -440,11 +430,14 @@ fn paint_background(cr: &cairo::Context, w: f64, h: f64, bg: Background) {
                 let small = obtura_image::resize(&b, (w as u32 * 2).max(1), ((w * 2.0) * b.height as f64 / b.width.max(1) as f64).round().max(1.0) as u32);
                 if let Ok(surface) = obtura_render::to_surface(&small) {
                     let k = (w / small.width as f64).max(h / small.height as f64);
+                    // (save/restore, not identity_matrix: the context GTK gives may be moved
+                    // or scaled already, on a HiDPI screen say.)
+                    let _ = cr.save();
                     cr.translate((w - small.width as f64 * k) / 2.0, (h - small.height as f64 * k) / 2.0);
                     cr.scale(k, k);
                     let _ = cr.set_source_surface(&surface, 0.0, 0.0);
                     let _ = cr.paint();
-                    cr.identity_matrix();
+                    let _ = cr.restore();
                 }
             }
         }

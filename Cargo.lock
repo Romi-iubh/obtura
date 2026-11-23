@@ -622,7 +622,7 @@ dependencies = [
 
 [[package]]
 name = "obtura"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "gtk4",
  "libadwaita",
@@ -635,7 +635,7 @@ dependencies = [
 
 [[package]]
 name = "obtura-capture"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "gio",
  "obtura-image",
@@ -643,7 +643,7 @@ dependencies = [
 
 [[package]]
 name = "obtura-core"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "obtura-image",
  "obtura-scene",
@@ -653,7 +653,7 @@ dependencies = [
 
 [[package]]
 name = "obtura-image"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "gif",
  "image",
@@ -662,7 +662,7 @@ dependencies = [
 
 [[package]]
 name = "obtura-render"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "cairo-rs",
  "obtura-image",
@@ -672,7 +672,7 @@ dependencies = [
 
 [[package]]
 name = "obtura-scene"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "obtura-image",
  "serde",

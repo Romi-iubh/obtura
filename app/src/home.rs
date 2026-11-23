@@ -34,6 +34,10 @@ pub fn open(app: &adw::Application) -> adw::ApplicationWindow {
         ("pin", "Pin", "Select a region and keep it in view in a small window", "app.capture-pin"),
         ("library", "Library", "Every screenshot taken, searchable by its text (Ctrl+L)", "app.library"),
     ] {
+        // Recording is not in the Windows version yet.
+        if cfg!(windows) && icon == "record" {
+            continue;
+        }
         let face = gtk::Box::new(gtk::Orientation::Vertical, 4);
         face.append(&crate::icons::image(icon));
         face.append(&gtk::Label::new(Some(label)));
@@ -90,12 +94,20 @@ fn keys_line() -> Option<gtk::Widget> {
     let on = crate::global_keys::current();
     if !on.is_empty() {
         label.set_label(&format!("In every app: {}", said(&on)));
+        #[cfg(windows)]
+        if crate::global_keys::snipping_tool_has_print_screen() {
+            return Some(snipping_tool_note(label));
+        }
         return Some(label.upcast());
     }
     let first = &crate::global_keys::KEYS[0];
     let add = gtk::Button::builder()
         .label(format!("Use {} in Every App", crate::global_keys::label(first.binding)))
-        .tooltip_text("Adds Obtura's keys to GNOME's keyboard shortcuts, so they work while other apps are in front (Preferences can remove them)")
+        .tooltip_text(if cfg!(windows) {
+            "Print Screen and the others then work while other apps are in front; Obtura stays in the notification area for them (Preferences can turn them off)"
+        } else {
+            "Adds Obtura's keys to GNOME's keyboard shortcuts, so they work while other apps are in front (Preferences can remove them)"
+        })
         .css_classes(["flat"])
         .halign(gtk::Align::Center)
         .margin_top(12)
@@ -120,4 +132,27 @@ fn keys_line() -> Option<gtk::Widget> {
         }
     });
     Some(place.upcast())
+}
+
+/// Windows 11 gives Print Screen to its Snipping Tool until that is turned off in Windows'
+/// Settings: says so under the keys, with a button to that page.
+#[cfg(windows)]
+fn snipping_tool_note(keys: gtk::Label) -> gtk::Widget {
+    let place = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    place.append(&keys);
+    let note = gtk::Label::builder()
+        .label("Print Screen opens Windows' Snipping Tool for now. To give it to Obtura, turn off “Use the Print screen key to open screen capture” in Windows' keyboard settings.")
+        .css_classes(["dim-label", "caption"])
+        .wrap(true)
+        .justify(gtk::Justification::Center)
+        .max_width_chars(60)
+        .build();
+    place.append(&note);
+    let open = gtk::Button::builder().label("Open Windows' Keyboard Settings").css_classes(["flat"]).halign(gtk::Align::Center).build();
+    open.connect_clicked(|b| {
+        let window = b.root().and_downcast::<gtk::Window>();
+        gtk::UriLauncher::new(crate::global_keys::KEYBOARD_SETTINGS).launch(window.as_ref(), gtk::gio::Cancellable::NONE, |_| {});
+    });
+    place.append(&open);
+    place.upcast()
 }

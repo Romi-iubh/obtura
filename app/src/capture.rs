@@ -174,7 +174,7 @@ pub fn start(app: &adw::Application, backend: Rc<dyn CaptureBackend>, request: R
     // The first time a screenshot is taken through screen sharing, say what GNOME will ask.
     // A scrolling capture always goes through screen sharing.
     let quiet = (settings.quiet_capture && needs_still(&request)) || request.mode == Mode::Scrolling;
-    if quiet && backend.shares_real_screen() && obtura_core::screen_share::load().is_none() {
+    if quiet && backend.shares_real_screen() && !backend.capture_is_quiet() && obtura_core::screen_share::load().is_none() {
         let app2 = app.clone();
         return explain_sharing(app, move |go| match go {
             true => begin(&app2, backend, request, settings, done),
@@ -430,7 +430,8 @@ pub type StillDone = Box<dyn FnOnce(Result<Still, CaptureError>)>;
 /// A still picture of the screen. `quiet`: through screen sharing (no flash; GNOME may ask which
 /// screens the first time). If sharing is not possible, through GNOME's screenshot service.
 pub fn still_picture(backend: Rc<dyn CaptureBackend>, quiet: bool, done: StillDone) {
-    if !quiet {
+    // Without a flash anyway (Windows): no screen sharing needed.
+    if !quiet || backend.capture_is_quiet() {
         return flash_picture(backend, done);
     }
     let token = obtura_core::screen_share::load();

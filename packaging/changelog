@@ -1,3 +1,12 @@
+obtura (0.9.1-1) noble; urgency=medium
+
+  * Obtura for Windows 10 and 11 (a separate installer and zip; the Ubuntu
+    package is unchanged apart from the fixes below).
+  * Editor: a mark below a blur, pixelate, box or magnifier now shows its new
+    shape at once when it is resized, turned or bent.
+
+ -- Rosaire <123895137+Romi-iubh@users.noreply.github.com>  Mon, 23 Nov 2026 07:25:50 +0100
+
 obtura (0.9.0-1) noble; urgency=medium
 
   * First package, for Ubuntu 24.04 LTS and every newer release: the release

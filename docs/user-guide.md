@@ -1,8 +1,10 @@
 # Obtura User Guide
 
-*Version 0.9 · for Ubuntu 24.04 LTS and newer*
+*Version 0.9 · for Ubuntu 24.04 LTS and newer, and Windows 10 and 11*
 
-Obtura takes screenshots and records the screen on the GNOME desktop. Its editor opens
+Obtura takes screenshots and records the screen on the GNOME desktop. It also runs on
+Windows 10 and 11: if you use Windows, read [Obtura on Windows](#18-obtura-on-windows)
+first. Its editor opens
 right after a capture: point things out with arrows, text and numbered steps, hide what
 should stay private, frame the picture, and paste it anywhere. It also captures long
 pages that scroll, reads the text and the QR codes in a picture, picks colours, measures
@@ -32,6 +34,7 @@ account and sends nothing anywhere.
 15. [Troubleshooting](#15-troubleshooting)
 16. [Your data and privacy](#16-your-data-and-privacy)
 17. [Licence and credits](#17-licence-and-credits)
+18. [Obtura on Windows](#18-obtura-on-windows)
 
 ---
 
@@ -49,7 +52,7 @@ account and sends nothing anywhere.
 
 Open the [Obtura releases page](https://github.com/Romi-iubh/obtura/releases/latest)
 and download the file whose name ends in `_amd64.deb`, for example
-`obtura_0.9.0-1_amd64.deb`. It goes to your **Downloads** folder.
+`obtura_0.9.1-1_amd64.deb`. It goes to your **Downloads** folder.
 
 ### Install with the Terminal (recommended)
 
@@ -60,7 +63,7 @@ for reading text (Tesseract).
 2. Type the line below and press **Enter**:
 
    ```
-   sudo apt install ~/Downloads/obtura_0.9.0-1_amd64.deb
+   sudo apt install ~/Downloads/obtura_0.9.1-1_amd64.deb
    ```
 
 3. Type your password when asked (nothing shows while you type) and press **Enter**.
@@ -804,3 +807,88 @@ built into Obtura are in **About › Legal** and in
 `/usr/share/doc/obtura/THIRD-PARTY-LICENSES.txt`.
 
 © 2026 Rosaire.
+
+---
+
+## 18. Obtura on Windows
+
+Obtura runs on Windows 10 and Windows 11 (64-bit). Everything in this guide works the
+same way, except what this section lists. Where the guide says "GNOME" or "the top bar",
+read "Windows" and "the notification area" (the icons by the clock).
+
+### Install
+
+1. Download `Obtura-0.9.1-setup.exe`.
+2. Double-click it. If Windows says **Windows protected your PC** (the installer is not
+   signed by a company), click **More info**, then **Run anyway**.
+3. Click **Next** until **Finish**. Obtura is installed for you only, in
+   `AppData\Local\Programs\Obtura`; no administrator password is needed. Two choices on
+   the way: start Obtura in the background when you sign in (on: Print Screen then works
+   at once), and a shortcut on the desktop (off).
+
+Obtura is then in the Start menu. To run it without installing, unpack
+`Obtura-0.9.1-windows-x64.zip`, open the folders **Obtura**, then **bin**, and
+double-click **obtura.exe** (keep the folders together).
+
+**Update**: run the new installer. **Remove**: Windows **Settings › Apps › Installed
+apps › Obtura › Uninstall**. Your settings, your library and your saved pictures are kept.
+
+### Print Screen and Obtura's icon
+
+| Key | What it does |
+| --- | --- |
+| Print Screen | Capture a region |
+| Shift+Print Screen | Copy the text of a region |
+| Ctrl+Print Screen | Capture the whole screen |
+
+These keys work in every app while Obtura runs. Once opened, Obtura stays running with
+its icon in the notification area: click the icon to capture a region, right-click it
+for the other captures, the library, Preferences and **Quit Obtura**. Windows may hide
+the icon under the **^** arrow by the clock; drag it onto the taskbar to keep it in view.
+**Preferences › Keys that work in every app** turns the keys off.
+
+**Windows 11 gives Print Screen to its Snipping Tool.** To give it to Obtura, open
+Windows **Settings › Accessibility › Keyboard** and turn off **Use the Print screen key
+to open screen capture**. Obtura's start window says so, with a button that opens that
+page.
+
+### What is different
+
+- **No question, no flash.** Windows lets Obtura read the screen directly: the first
+  capture does not ask anything, and the screen never flashes.
+- **A window** (New › A Window…): Obtura captures the window you were using, the one in
+  front of the others. Click that window first, then use the menu of Obtura's icon or
+  the New button.
+- **Scrolling capture**: to finish, press **Print Screen** again, or click Obtura's
+  icon. A message by the clock says so when the capture starts.
+- **Pins** stay above the other windows; right-click a pin, **Keep Above Other Windows**,
+  to let it go back among them.
+- **Recording the screen is not available on Windows yet.** Windows' own Snipping Tool
+  records the screen: press **Win+Shift+R**.
+- **Text reading** comes with Tesseract and the English language. For another language,
+  download its `.traineddata` file from <https://github.com/tesseract-ocr/tessdata> into
+  `AppData\Local\Programs\Obtura\share\tessdata`, then name it in **Preferences ›
+  Text reading**.
+- **Command line**: the options of [The command line](#12-the-command-line) work, apart
+  from `--record` (`--window` takes the window in front), with the full path of the program:
+  `"%LOCALAPPDATA%\Programs\Obtura\bin\obtura.exe" --region`. **Preferences › Other
+  keys** shows each command ready to copy, and how to give it a key of its own.
+
+### Where Obtura keeps things on Windows
+
+| Where | What |
+| --- | --- |
+| `Pictures\Screenshots` | Saved pictures (or the folder you chose) |
+| `%LOCALAPPDATA%\Obtura\Data\library` | The library |
+| `%LOCALAPPDATA%\Obtura\Data\backgrounds` | Pictures chosen as a Beautify background |
+| `%APPDATA%\Obtura\settings.json` | Preferences, tool styles, your frame |
+| `%LOCALAPPDATA%\Obtura\State` | The last region chosen; the log file `obtura.log` |
+| `%LOCALAPPDATA%\Obtura\Cache` | The parts of a scrolling capture under way |
+
+Updating or removing Obtura never touches these folders.
+
+Obtura for Windows comes with GTK, libadwaita, GLib, cairo, Pango, Tesseract and the
+libraries they need (from the MSYS2 project), each under its own licence. The list is
+in `share\doc\obtura\WINDOWS-COMPONENTS.txt` in Obtura's folder, the licence texts
+in `share\licenses`.
+

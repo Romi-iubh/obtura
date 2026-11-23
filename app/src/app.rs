@@ -9,7 +9,7 @@ use crate::{
 };
 use adw::prelude::*;
 use gtk::{gio, glib};
-use obtura_capture::{CaptureBackend, FakeBackend, PortalBackend};
+use obtura_capture::{CaptureBackend, FakeBackend};
 use std::{cell::Cell, ffi::OsString, path::PathBuf, rc::Rc};
 
 pub const APP_ID: &str = "com.grasshillsco.Obtura";
@@ -77,6 +77,12 @@ pub fn run() -> glib::ExitCode {
             crate::scroll::clean_up_leftovers();
             // Old captures go, as the settings ask (never the ones marked "keep always").
             crate::library::clean_up(&obtura_core::settings::Settings::load());
+            // Windows: the icon in the notification area, and Print Screen in every app.
+            #[cfg(windows)]
+            {
+                crate::tray::start(app);
+                crate::global_keys::start(app);
+            }
         }
     });
     // Started by D-Bus activation (the app grid, a click on the dock icon of a running Obtura).
@@ -310,6 +316,11 @@ fn open(app: &adw::Application) {
         obtura_core::log::info("opened during a scrolling capture: finishing it");
         return crate::scroll::finish();
     }
+    // Windows: once opened, Obtura stays in the notification area for Print Screen.
+    #[cfg(windows)]
+    if crate::global_keys::enabled() {
+        capture::keep_running(app);
+    }
     // A window that is on the screen comes forward (a see-through one is in a capture).
     let shown = |w: &gtk::Window| w.is_visible() && w.opacity() > 0.0;
     match app.active_window().filter(shown).or_else(|| app.windows().into_iter().find(shown)) {
@@ -421,7 +432,7 @@ fn install_actions(app: &adw::Application, backend: &Rc<dyn CaptureBackend>) {
 
 /// The fake backend when `OBTURA_FAKE_CAPTURE` names a PNG (tests and `scripts/smoke.sh`;
 /// with `OBTURA_FAKE_PERMISSION=ask` its first screenshot is refused as GNOME does before the
-/// user was asked), the portals otherwise.
+/// user was asked), the portals otherwise (on Windows, the screen itself).
 fn backend() -> Rc<dyn CaptureBackend> {
     if let Some(path) = std::env::var_os("OBTURA_FAKE_CAPTURE").map(PathBuf::from) {
         // OBTURA_FAKE_SCROLL names a tall PNG the fake screen scrolls through (scrolling capture).
@@ -439,7 +450,10 @@ fn backend() -> Rc<dyn CaptureBackend> {
             Err(e) => eprintln!("obtura: OBTURA_FAKE_CAPTURE: {e}"),
         }
     }
-    Rc::new(PortalBackend::new(APP_ID))
+    #[cfg(windows)]
+    return Rc::new(obtura_capture::WindowsBackend);
+    #[cfg(not(windows))]
+    Rc::new(obtura_capture::PortalBackend::new(APP_ID))
 }
 
 #[cfg(test)]

@@ -396,15 +396,18 @@ fn pick_picture(w: &Rc<Window>, then: impl Fn(&Rc<Window>, Bitmap) + 'static) {
     });
 }
 
-/// Asks for a picture file (from any window), then hands its pixels to `then`. A file that
-/// cannot be read is logged and ignored.
-pub fn choose_picture_file(parent: Option<&gtk::Window>, then: impl Fn(Bitmap) + 'static) {
+/// Asks for a picture file (from any window), then hands its pixels to `then` (`None` when
+/// none was chosen; a file that cannot be read is logged).
+pub fn choose_picture_file(parent: Option<&gtk::Window>, then: impl FnOnce(Option<Bitmap>) + 'static) {
     let dialog = picture_dialog("Choose a Picture", &obtura_core::paths::pictures_dir(), false);
     dialog.open(parent, gio::Cancellable::NONE, move |result| {
-        let Ok(file) = result else { return };
+        let Ok(file) = result else { return then(None) };
         match load_picture(&file) {
-            Ok(b) => then(b),
-            Err(e) => obtura_core::log::warn(&format!("cannot open that picture: {e}")),
+            Ok(b) => then(Some(b)),
+            Err(e) => {
+                obtura_core::log::warn(&format!("cannot open that picture: {e}"));
+                then(None)
+            }
         }
     });
 }
@@ -576,6 +579,10 @@ struct RecordModule;
 
 impl Module for RecordModule {
     fn install(&self, w: &Rc<Window>) {
+        // Recording is not in the Windows version yet.
+        if cfg!(windows) {
+            return;
+        }
         let section = gio::Menu::new();
         section.append(Some("Record the Screen…"), Some("app.record"));
         w.main_menu.append_section(None, &section);

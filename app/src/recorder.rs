@@ -174,6 +174,10 @@ pub fn pause_and_show() {
 /// called when the recording is saved (with its path), cancelled or failed; when this call
 /// stops a recording, at once.
 pub fn toggle(app: &adw::Application, backend: Rc<dyn CaptureBackend>, what: What, done: Done) {
+    if cfg!(windows) {
+        not_on_windows(app);
+        return done(Outcome::Failed(obtura_capture::NOT_ON_WINDOWS.into()));
+    }
     if is_recording() {
         stop();
         return done(Outcome::Done);
@@ -1089,8 +1093,23 @@ impl Saved {
     }
 }
 
+/// Windows: recording is not there yet; says what Windows itself offers.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn not_on_windows(app: &adw::Application) {
+    let parent = app.active_window().unwrap_or_else(|| crate::home::open(app).upcast());
+    let dialog = adw::AlertDialog::new(
+        Some("Recording is not available on Windows yet"),
+        Some("Obtura for Windows takes screenshots, reads text and QR codes, and annotates; recording the screen comes later.\n\nMeanwhile, Windows' own Snipping Tool records the screen: press Win+Shift+R."),
+    );
+    dialog.add_response("ok", "OK");
+    dialog.present(Some(&parent));
+}
+
 /// The Record window: what to record and how, then Record a Screen / Record an Area.
 pub fn setup(app: &adw::Application, backend: Rc<dyn CaptureBackend>) {
+    if cfg!(windows) {
+        return not_on_windows(app);
+    }
     if is_recording() {
         return pause_and_show();
     }

@@ -137,6 +137,10 @@ struct Underlay {
     n: usize,
     /// Where it goes, in picture coordinates (bigger than the screenshot when marks need room).
     rect: Rect,
+    /// The screenshot and the marks it was drawn from: a mark below the last redaction that is
+    /// reshaped, turned or restyled makes it stale (cheap to compare: pictures are shared).
+    base: Rc<Bitmap>,
+    marks: Vec<Object>,
     surface: cairo::ImageSurface,
 }
 
@@ -191,31 +195,9 @@ struct State {
     proposals: Vec<RectF>,
 }
 
-pub struct Editor {
-    pub widget: gtk::Overlay,
-    area: gtk::DrawingArea,
-    text: gtk::TextView,
-    text_css: gtk::CssProvider,
-    st: RefCell<State>,
-    listeners: RefCell<Vec<Rc<dyn Fn(Change)>>>,
-    requests: RefCell<Vec<Rc<dyn Fn(&Request)>>>,
-}
-
-impl Editor {
-    pub fn new(image: Bitmap) -> Rc<Self> {
-        let area = gtk::DrawingArea::builder().hexpand(true).vexpand(true).focusable(true).build();
-        let text = gtk::TextView::builder().visible(false).halign(gtk::Align::Start).valign(gtk::Align::Start).wrap_mode(gtk::WrapMode::None).accepts_tab(false).build();
-        text.add_css_class("obtura-text");
-        let widget = gtk::Overlay::new();
-        widget.set_child(Some(&area));
-        widget.add_overlay(&text);
-        widget.set_overflow(gtk::Overflow::Hidden);
-
-        let text_css = gtk::CssProvider::new();
-        if let Some(display) = gdk::Display::default() {
-            gtk::style_context_add_provider_for_display(&display, &text_css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
-        }
-        let st = State {
+impl State {
+    fn new(image: Bitmap) -> State {
+        State {
             doc: Document::new(image),
             tool: Tool::Line,
             styles: HashMap::new(),
@@ -243,7 +225,35 @@ impl Editor {
             grab: None,
             seen: None,
             proposals: Vec::new(),
-        };
+        }
+    }
+}
+
+pub struct Editor {
+    pub widget: gtk::Overlay,
+    area: gtk::DrawingArea,
+    text: gtk::TextView,
+    text_css: gtk::CssProvider,
+    st: RefCell<State>,
+    listeners: RefCell<Vec<Rc<dyn Fn(Change)>>>,
+    requests: RefCell<Vec<Rc<dyn Fn(&Request)>>>,
+}
+
+impl Editor {
+    pub fn new(image: Bitmap) -> Rc<Self> {
+        let area = gtk::DrawingArea::builder().hexpand(true).vexpand(true).focusable(true).build();
+        let text = gtk::TextView::builder().visible(false).halign(gtk::Align::Start).valign(gtk::Align::Start).wrap_mode(gtk::WrapMode::None).accepts_tab(false).build();
+        text.add_css_class("obtura-text");
+        let widget = gtk::Overlay::new();
+        widget.set_child(Some(&area));
+        widget.add_overlay(&text);
+        widget.set_overflow(gtk::Overflow::Hidden);
+
+        let text_css = gtk::CssProvider::new();
+        if let Some(display) = gdk::Display::default() {
+            gtk::style_context_add_provider_for_display(&display, &text_css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+        }
+        let st = State::new(image);
         let ed = Rc::new(Self { widget, area, text, text_css, st: RefCell::new(st), listeners: RefCell::new(Vec::new()), requests: RefCell::new(Vec::new()) });
         ed.connect();
         ed.update_cursor();
@@ -744,6 +754,7 @@ impl Editor {
         self.redraw();
         if done {
             self.notify(Change::Document);
+            self.notify(Change::Selection);
         }
     }
 
@@ -1891,15 +1902,18 @@ fn union(a: Rect, b: Rect) -> Rect {
 /// they need. A spotlight among them dims the whole `canvas`, as on export.
 fn ensure_underlay(st: &mut State, canvas: Rect) {
     let n = underlay_len(&st.doc.scene);
-    let below = &st.doc.scene.objects()[..n];
+    // A text being typed again is left out: the typing field shows it.
+    let editing = st.editing.as_ref().and_then(|e| e.id);
+    let below: Vec<Object> = st.doc.scene.objects()[..n].iter().filter(|o| Some(o.id) != editing).cloned().collect();
     let (bw, bh) = (st.doc.base.width, st.doc.base.height);
-    let rect = if below.iter().any(|o| matches!(o.kind, Kind::Spotlight { .. })) { canvas } else { canvas_of(below, bw, bh) };
-    if st.underlay.as_ref().is_some_and(|u| u.n == n && u.rect == rect) {
+    let rect = if below.iter().any(|o| matches!(o.kind, Kind::Spotlight { .. })) { canvas } else { canvas_of(&below, bw, bh) };
+    if st.underlay.as_ref().is_some_and(|u| u.n == n && u.rect == rect && Rc::ptr_eq(&u.base, &st.doc.base) && u.marks == below) {
         return;
     }
-    let bitmap = if n == 0 { Ok(st.doc.base.as_ref().clone()) } else { render_on(&st.doc.base, below, rect) };
+    let bitmap = if below.is_empty() { Ok(st.doc.base.as_ref().clone()) } else { render_on(&st.doc.base, &below, rect) };
+    let (base, marks) = (st.doc.base.clone(), below);
     st.underlay = match bitmap.and_then(|b| to_surface(&b)) {
-        Ok(surface) => Some(Underlay { n, rect, surface }),
+        Ok(surface) => Some(Underlay { n, rect, base, marks, surface }),
         Err(e) => {
             obtura_core::log::error(&format!("cannot draw the picture: {e}"));
             None
@@ -1989,6 +2003,35 @@ fn draw_crop(cr: &cairo::Context, view: &View, c: RectF, (iw, ih): (f64, f64)) {
 mod tests {
     use super::*;
     use obtura_scene::quad_control;
+
+    #[test]
+    fn a_mark_reshaped_below_a_redaction_shows_at_once() {
+        // The view keeps the marks below the last redaction as one cached picture. A mark in
+        // there that is resized by a handle or turned must show its new shape at once.
+        let mut st = State::new(Bitmap::filled(100, 80, [255, 255, 255, 255]));
+        let filled = Style { fill: Some(obtura_scene::Color::BLACK), ..Tool::Rect.default_style() };
+        let id = st.doc.scene.add(Kind::Rect { rect: RectF { x: 10.0, y: 10.0, w: 20.0, h: 20.0 } }, filled);
+        st.doc.scene.add(Kind::Redact { rect: RectF { x: 70.0, y: 50.0, w: 20.0, h: 20.0 }, mode: RedactMode::Box }, Tool::Box.default_style());
+        let canvas = Rect::new(0, 0, 100, 80);
+        let dark_at = |st: &State, x: usize, y: usize| {
+            let mut dark = false;
+            st.underlay.as_ref().expect("drawn").surface.with_data(|d| dark = d[(y * 100 + x) * 4] < 128).expect("surface data");
+            dark
+        };
+        ensure_underlay(&mut st, canvas);
+        assert!(dark_at(&st, 20, 20) && !dark_at(&st, 50, 20));
+        // As a handle drag does it: the mark changes, nothing else is told.
+        st.doc.scene.get_mut(id).expect("mark").kind = Kind::Rect { rect: RectF { x: 40.0, y: 10.0, w: 20.0, h: 20.0 } };
+        ensure_underlay(&mut st, canvas);
+        assert!(!dark_at(&st, 20, 20) && dark_at(&st, 50, 20));
+        // A mark being typed again (a text box) is left out while the typing field shows it.
+        st.editing = Some(TextEditing { id: Some(id), at: Point::new(40.0, 10.0), style: filled, tip: None });
+        ensure_underlay(&mut st, canvas);
+        assert!(!dark_at(&st, 50, 20));
+        st.editing = None;
+        ensure_underlay(&mut st, canvas);
+        assert!(dark_at(&st, 50, 20));
+    }
 
     #[test]
     fn the_view_fits_a_big_picture_and_never_enlarges_a_small_one() {

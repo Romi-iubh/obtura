@@ -90,7 +90,8 @@ pub fn start(app: &adw::Application, backend: Rc<dyn CaptureBackend>, request: R
     for w in &hidden {
         w.set_visible(false);
     }
-    if !obtura_capture::record::tools_present() && backend.shares_real_screen() {
+    // (On Windows Obtura reads the frames from the screen itself.)
+    if !obtura_capture::record::tools_present() && backend.shares_real_screen() && !backend.capture_is_quiet() {
         return capture::fail(app, &request, &hidden, CaptureError::Failed("A scrolling capture needs GStreamer's tools. Install them with:\nsudo apt install gstreamer1.0-tools gstreamer1.0-pipewire gstreamer1.0-plugins-good".into()), done);
     }
     let app = app.clone();
@@ -126,6 +127,13 @@ fn choose(app: &adw::Application, cast: Rc<obtura_capture::Cast>, still: capture
         }
     };
     let streams = recorder::stream_rects(&cast, &desktop);
+    // Windows: the one shared "screen" is the whole desktop, read from the screen like the
+    // still picture, so the part chosen is cut by the picture's own pixels (exact at any
+    // screen scale, whatever scale GTK reports).
+    #[cfg(windows)]
+    let exact = cast.screen_area(0).map(|_| (still.picture.width, still.picture.height));
+    #[cfg(not(windows))]
+    let exact: Option<(u32, u32)> = None;
     let slot = Rc::new(RefCell::new(Some((cast, request, hidden, settings, done))));
     let (app2, slot2) = (app.clone(), slot.clone());
     let shown = overlay::select_region(
@@ -137,7 +145,13 @@ fn choose(app: &adw::Application, cast: Rc<obtura_capture::Cast>, still: capture
         None,
         Box::new(move |area| {
             let Some((cast, request, hidden, settings, done)) = slot2.borrow_mut().take() else { return };
-            let target = area.and_then(|a| recorder::target(&streams, (a.x, a.y, a.w, a.h), false));
+            let target = area.as_ref().and_then(|a| match exact {
+                Some(frame) => a.in_pixels(frame.0, frame.1).map(|r| {
+                    let crop = obtura_capture::record::Crop::of(frame, (r.x.max(0) as u32, r.y.max(0) as u32, r.w, r.h), false);
+                    recorder::Target { stream: 0, crop, size: crop.size(frame) }
+                }),
+                None => recorder::target(&streams, (a.x, a.y, a.w, a.h), false),
+            });
             match (area, target) {
                 (None, _) => {
                     cast.close();

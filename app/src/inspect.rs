@@ -123,6 +123,8 @@ pub fn lines_said(text: &str) -> String {
 /// Explains why text could not be read: tesseract missing gets the command to install it.
 fn explain(w: &Rc<Window>, e: &OcrError) {
     match e {
+        // Windows: tesseract comes with Obtura; the message says to install Obtura again.
+        OcrError::Missing if cfg!(windows) => w.toast(&e.to_string()),
         OcrError::Missing => {
             let dialog = adw::AlertDialog::new(Some("Text reading is not installed"), Some("Obtura reads text with the tesseract program, which is not on this computer. Install it from a terminal with:\n\nsudo apt install tesseract-ocr"));
             dialog.add_responses(&[("copy", "Copy the Command"), ("ok", "OK")]);

@@ -41,6 +41,9 @@ pub struct Settings {
     /// What the editor's New button takes ("region", "scrolling", "screen-5"...): the kind of
     /// the last capture that opened an editor, or what was chosen beside the button.
     pub new_capture: String,
+    /// Windows: Print Screen and the other keys work in every app (on Linux these keys are in
+    /// GNOME's own keyboard shortcuts, not here).
+    pub keys_everywhere: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -105,6 +108,7 @@ impl Default for Settings {
             record: RecordSettings::default(),
             color_format: crate::color::ColorFormat::Hex,
             new_capture: "region".into(),
+            keys_everywhere: true,
         }
     }
 }

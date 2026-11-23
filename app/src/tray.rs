@@ -6,6 +6,10 @@
 //!
 //! The objects are registered once and stay: between recordings the item is "Passive", which
 //! hides it.
+//!
+//! On Windows the same calls drive Obtura's icon in the notification area (`win32::tray`),
+//! which stays there while Obtura runs, with a menu of captures when nothing is under way.
+#![cfg_attr(windows, allow(dead_code))]
 
 use gtk::gio;
 use gtk::glib::{self, variant::ToVariant, Variant, VariantTy};
@@ -276,11 +280,13 @@ fn watcher_present(conn: &gio::DBusConnection) -> bool {
 
 /// Shows the icon (recording, `label` beside it); menu choices go to `on_action`. Returns false
 /// if the top bar shows no status icons (then the caller offers another way to pause).
+#[cfg(not(windows))]
 pub fn show(label: &str, on_action: impl Fn(Action) + 'static) -> bool {
     show_as(Mode::Recording, label, on_action)
 }
 
 /// Shows the icon for `mode`, `label` beside it. Returns false without a status-icon host.
+#[cfg(not(windows))]
 pub fn show_as(mode: Mode, label: &str, on_action: impl Fn(Action) + 'static) -> bool {
     let Ok(conn) = gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE) else { return false };
     if !watcher_present(&conn) {
@@ -326,6 +332,7 @@ pub fn show_as(mode: Mode, label: &str, on_action: impl Fn(Action) + 'static) ->
 }
 
 /// The time beside the icon, and whether the recording is paused (icon and menu change).
+#[cfg(not(windows))]
 pub fn update(label: &str, paused: bool) {
     let Some(tray) = TRAY.with(|t| t.borrow().clone()) else { return };
     let changed = {
@@ -350,6 +357,7 @@ pub fn update(label: &str, paused: bool) {
 }
 
 /// Hides the icon (between recordings).
+#[cfg(not(windows))]
 pub fn hide() {
     let Some(tray) = TRAY.with(|t| t.borrow().clone()) else { return };
     {
@@ -358,6 +366,121 @@ pub fn hide() {
         s.on_action = None;
     }
     emit(&tray.conn, ITEM_PATH, ITEM, "NewStatus", Some(("Passive",).to_variant()));
+}
+
+#[cfg(windows)]
+pub use self::windows::{hide, show, show_as, start, update};
+
+/// Windows: the icon in the notification area. Between captures its menu offers the captures
+/// (a left click captures a region); during a countdown, a scrolling capture or a recording it
+/// offers that mode's choices (a left click takes the first) and its tooltip shows the label.
+#[cfg(windows)]
+mod windows {
+    use super::*;
+    use crate::win32::tray as icon;
+    use gtk::prelude::*;
+
+    struct Shown {
+        mode: Mode,
+        paused: bool,
+        label: String,
+        on_action: Rc<dyn Fn(Action)>,
+    }
+
+    thread_local! {
+        static APP: RefCell<Option<adw::Application>> = const { RefCell::new(None) };
+        static SHOWN: RefCell<Option<Shown>> = const { RefCell::new(None) };
+    }
+
+    /// The menu between captures: (id, label, what it does).
+    const IDLE: [(u32, Option<&str>, &str); 11] = [
+        (100, Some("Capture a Region"), "capture-region"),
+        (101, Some("Capture the Full Screen"), "capture-screen"),
+        (102, Some("Capture a Window"), "capture-window"),
+        (103, Some("Scrolling Capture"), "capture-scrolling"),
+        (104, Some("Copy Text from the Screen"), "capture-text"),
+        (0, None, ""),
+        (105, Some("Open Obtura"), ""),
+        (106, Some("Library"), "library"),
+        (107, Some("Preferences"), "preferences"),
+        (0, None, ""),
+        (108, Some("Quit Obtura"), ""),
+    ];
+
+    /// At start: the icon, with the captures' menu.
+    pub fn start(app: &adw::Application) {
+        APP.with(|a| *a.borrow_mut() = Some(app.clone()));
+        app.connect_shutdown(|_| icon::remove());
+        idle();
+    }
+
+    fn idle() {
+        let items = IDLE.iter().map(|(id, l, _)| (*id, l.map(String::from))).collect();
+        icon::show("Obtura: click to capture a region, right-click for more", items, Some(100), |id| {
+            let Some(app) = APP.with(|a| a.borrow().clone()) else { return };
+            match IDLE.iter().find(|(i, _, _)| *i == id) {
+                Some((105, _, _)) => app.activate(),
+                Some((108, _, _)) => app.quit(),
+                Some((_, _, action)) if !action.is_empty() => app.activate_action(action, None),
+                _ => {}
+            }
+        });
+    }
+
+    fn put(s: &Shown) -> bool {
+        let items: icon::Items = items(s.mode, s.paused).into_iter().map(|(id, l)| (id as u32, l.map(String::from))).collect();
+        let first = items.iter().find(|(_, l)| l.is_some()).map(|(id, _)| *id);
+        let (mode, paused, f) = (s.mode, s.paused, s.on_action.clone());
+        icon::show(&format!("Obtura: {}", s.label), items, first, move |id| {
+            if let Some(a) = action_of(id as i32, mode, paused) {
+                f(a)
+            }
+        })
+    }
+
+    pub fn show(label: &str, on_action: impl Fn(Action) + 'static) -> bool {
+        show_as(Mode::Recording, label, on_action)
+    }
+
+    pub fn show_as(mode: Mode, label: &str, on_action: impl Fn(Action) + 'static) -> bool {
+        let s = Shown { mode, paused: false, label: label.to_string(), on_action: Rc::new(on_action) };
+        let ok = put(&s);
+        SHOWN.with(|x| *x.borrow_mut() = Some(s));
+        if ok && mode == Mode::Scrolling {
+            let text = if crate::global_keys::current().is_empty() {
+                "To finish, click Obtura's icon in the notification area."
+            } else {
+                "To finish, press Print Screen again, or click Obtura's icon in the notification area."
+            };
+            icon::tell("Scroll slowly through what you selected", text);
+        }
+        ok
+    }
+
+    pub fn update(label: &str, paused: bool) {
+        let again = SHOWN.with(|x| {
+            let mut x = x.borrow_mut();
+            let s = x.as_mut()?;
+            let changed = s.paused != paused;
+            s.paused = paused;
+            s.label = label.to_string();
+            Some(changed)
+        });
+        match again {
+            Some(true) => {
+                SHOWN.with(|x| x.borrow().as_ref().map(put));
+            }
+            Some(false) => icon::set_tooltip(&format!("Obtura: {label}")),
+            None => {}
+        }
+    }
+
+    /// Back to the captures' menu.
+    pub fn hide() {
+        if SHOWN.with(|x| x.borrow_mut().take()).is_some() {
+            idle();
+        }
+    }
 }
 
 #[cfg(test)]

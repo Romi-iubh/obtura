@@ -8,11 +8,18 @@ pub mod record;
 mod screencast;
 pub mod scroll;
 mod shot;
+#[cfg(windows)]
+pub mod windows;
 
 pub use fake::FakeBackend;
 pub use portal::PortalBackend;
 pub use screencast::{sound_args, Cast, CastDone, CastRequest, Sound, Stream};
 pub use shot::{png_size, Shot};
+#[cfg(windows)]
+pub use windows::WindowsBackend;
+
+/// Why screen recording does not start on Windows.
+pub const NOT_ON_WINDOWS: &str = "Recording the screen is not available in Obtura for Windows yet.";
 
 /// What to capture. More kinds (region, window, monitor) are added as they are built.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,6 +75,12 @@ pub trait CaptureBackend {
     /// fake backend does not.
     fn shares_real_screen(&self) -> bool {
         true
+    }
+
+    /// Whether [`capture`](Self::capture) is silent (no flash, no question), so that the still
+    /// picture behind the overlay is taken with it rather than through screen sharing (Windows).
+    fn capture_is_quiet(&self) -> bool {
+        false
     }
 
     /// Forgets the user's earlier "no" to screenshots, so that the system asks again at the

@@ -29,13 +29,24 @@ ImageMagick and tesseract.
    `packaging/test-install.sh dist/obtura_X.Y.Z-1_amd64.deb` installs it in clean
    Ubuntu 24.04 and 26.04 containers and tries it there (capture, text reading,
    recording, D-Bus activation, the dock menu's actions).
-8. **Source archive and checksums:**
+8. **Windows version:** `packaging/windows/build-exe.sh` (cross-compiles in Docker,
+   writes `dist/windows/Obtura-X.Y.Z-setup.exe`, `Obtura-X.Y.Z-windows-x64.zip` and
+   `SHA256SUMS-windows`; it installs the guide PDF, so step 5 comes first). Check it:
+   `packaging/windows/test-exe.sh` runs the real `obtura.exe` under Wine (screenshot
+   through Windows' GDI, a region dragged on the overlay, a window, a scrolling capture,
+   Print Screen, text and QR reading) and leaves pictures `dist/windows/wine-*.png` to
+   look at. If `Cargo.lock` changed, step 3 also wrote
+   `packaging/windows/THIRD-PARTY-LICENSES.txt`. Wine is not Windows: try the installer
+   on a real Windows 10 or 11 PC before publishing a Windows version.
+9. **Source archive and checksums:**
    ```
    git archive --format=tar.gz --prefix=obtura-X.Y.Z/ -o dist/obtura-X.Y.Z.tar.gz HEAD
    cp docs/Obtura-User-Guide.pdf dist/
    (cd dist && sha256sum obtura_X.Y.Z-1_amd64.deb obtura-X.Y.Z.tar.gz Obtura-User-Guide.pdf > SHA256SUMS)
    ```
-9. **Publish:** commit, tag and push, then create the release with the four files:
+10. **Publish:** commit, tag and push, then create the release with the four files
+   (and the Windows files, `dist/windows/Obtura-X.Y.Z-setup.exe`,
+   `Obtura-X.Y.Z-windows-x64.zip` and `SHA256SUMS-windows`, once tried on Windows):
    ```
    git commit -am "Obtura X.Y.Z" && git tag -a vX.Y.Z -m "Obtura X.Y.Z"
    git push origin main vX.Y.Z

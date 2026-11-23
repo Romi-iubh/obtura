@@ -12,9 +12,17 @@
 //! never record the real screen or sound.
 
 use crate::CaptureError;
-use gio::glib::{self, variant::ObjectPath, variant::ToVariant, Variant, VariantDict};
-use gio::prelude::*;
-use std::{cell::RefCell, os::fd::OwnedFd, rc::Rc};
+#[cfg(unix)]
+use gio::{glib, prelude::*};
+use gio::glib::{variant::ObjectPath, variant::ToVariant, Variant, VariantDict};
+use std::{cell::RefCell, rc::Rc};
+
+/// The descriptor of a PipeWire connection, given to `gst-launch-1.0`.
+#[cfg(unix)]
+pub use std::os::fd::OwnedFd as Fd;
+/// Windows has no PipeWire: there is never a descriptor to give.
+#[cfg(windows)]
+pub enum Fd {}
 
 const DEST: &str = "org.freedesktop.portal.Desktop";
 const PATH: &str = "/org/freedesktop/portal/desktop";
@@ -80,6 +88,9 @@ enum Inner {
     /// A test picture of each size (moving, for recordings) and, for still frames, a fixed
     /// picture.
     Fake { sizes: Vec<(u32, u32)>, picture: Option<Vec<u8>> },
+    /// Windows: parts of the screen, read when a frame is asked for (see `windows`).
+    #[cfg(windows)]
+    Screen { areas: Vec<crate::windows::Area> },
 }
 
 impl Cast {
@@ -108,6 +119,34 @@ impl Cast {
         }
     }
 
+    /// Windows: `areas` of the screen (physical pixels) as shared screens. The whole desktop
+    /// (`window` false) is placed where the desktop starts, at `scale`; a window keeps its place.
+    #[cfg(windows)]
+    pub fn screen_areas(areas: Vec<crate::windows::Area>, scale: f64, window: bool) -> Cast {
+        let logical = |v: u32| (v as f64 / scale).round() as i32;
+        Cast {
+            streams: areas
+                .iter()
+                .enumerate()
+                .map(|(i, a)| Stream { node: i as u32, position: window.then_some((a.x, a.y)), size: Some((logical(a.width), logical(a.height))) })
+                .collect(),
+            restore_token: None,
+            fake_page: None,
+            inner: Inner::Screen { areas },
+            on_closed: Rc::default(),
+            closed_sub: RefCell::new(None),
+        }
+    }
+
+    /// Windows: the part of the screen stream `index` shows (physical pixels).
+    #[cfg(windows)]
+    pub fn screen_area(&self, index: usize) -> Option<crate::windows::Area> {
+        match &self.inner {
+            Inner::Screen { areas } => areas.get(index).copied(),
+            _ => None,
+        }
+    }
+
     /// One still frame of stream `index`, as a PNG in physical pixels (no flash: this is how
     /// screenshots are taken without GNOME's flash). `done` is called once.
     pub fn grab_frame(&self, index: usize, done: impl FnOnce(Result<Vec<u8>, CaptureError>) + 'static) {
@@ -118,6 +157,8 @@ impl Cast {
         let fd = match &self.inner {
             Inner::Fake { picture: Some(png), .. } => return done(Ok(png.clone())),
             Inner::Fake { .. } => None,
+            #[cfg(windows)]
+            Inner::Screen { areas } => return done(areas.get(index).ok_or_else(|| CaptureError::Failed("no such screen".into())).and_then(|a| crate::windows::grab_png(*a))),
             Inner::Portal { conn, session } => match open_pipewire_remote(conn, session) {
                 Ok(fd) => Some(fd),
                 Err(e) => return done(Err(e)),
@@ -151,14 +192,14 @@ impl Cast {
 
     /// The `gst-launch-1.0` source of stream `index`, ending in raw video, and the descriptor
     /// it reads (to be given to the program as descriptor 3).
-    pub fn video_source(&self, index: usize) -> Result<(Vec<String>, Option<OwnedFd>), CaptureError> {
+    pub fn video_source(&self, index: usize) -> Result<(Vec<String>, Option<Fd>), CaptureError> {
         let (mut sources, fd) = self.video_sources(&[index])?;
         Ok((sources.remove(0), fd))
     }
 
     /// The sources of several streams at once (to record several screens into one picture), all
     /// reading the one descriptor given (as descriptor 3).
-    pub fn video_sources(&self, indices: &[usize]) -> Result<(Vec<Vec<String>>, Option<OwnedFd>), CaptureError> {
+    pub fn video_sources(&self, indices: &[usize]) -> Result<(Vec<Vec<String>>, Option<Fd>), CaptureError> {
         let streams: Vec<&Stream> = indices.iter().map(|i| self.streams.get(*i).ok_or_else(|| CaptureError::Failed("no such screen".into()))).collect::<Result<_, _>>()?;
         match &self.inner {
             Inner::Fake { sizes, .. } => Ok((
@@ -172,6 +213,8 @@ impl Cast {
                     .collect(),
                 None,
             )),
+            #[cfg(windows)]
+            Inner::Screen { .. } => Err(CaptureError::Failed(crate::NOT_ON_WINDOWS.into())),
             Inner::Portal { conn, session } => {
                 let fd = open_pipewire_remote(conn, session)?;
                 Ok((
@@ -406,8 +449,15 @@ fn close_session(conn: &gio::DBusConnection, session: &str) {
     conn.call(Some(DEST), session, SESSION, "Close", None, None, gio::DBusCallFlags::NONE, 5000, gio::Cancellable::NONE, |_| {});
 }
 
+/// Windows has no PipeWire.
+#[cfg(windows)]
+fn open_pipewire_remote(_conn: &gio::DBusConnection, _session: &str) -> Result<Fd, CaptureError> {
+    Err(CaptureError::Failed(crate::NOT_ON_WINDOWS.into()))
+}
+
 /// The PipeWire connection of a session (a descriptor), for one recording program.
-fn open_pipewire_remote(conn: &gio::DBusConnection, session: &str) -> Result<OwnedFd, CaptureError> {
+#[cfg(unix)]
+fn open_pipewire_remote(conn: &gio::DBusConnection, session: &str) -> Result<Fd, CaptureError> {
     let failed = |e: String| CaptureError::Failed(format!("cannot reach the shared screen: {e}"));
     let (reply, fds) = conn
         .call_with_unix_fd_list_sync(

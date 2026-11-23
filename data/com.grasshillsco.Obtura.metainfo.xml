@@ -61,19 +61,19 @@
   <screenshots>
     <screenshot type="default">
       <caption>The editor: arrows, text, numbered steps and a blurred email address</caption>
-      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.0/docs/screenshots/editor.png</image>
+      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.1/docs/screenshots/editor.png</image>
     </screenshot>
     <screenshot>
       <caption>Beautify: background, shadow and window bar in one click</caption>
-      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.0/docs/screenshots/beautify.png</image>
+      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.1/docs/screenshots/beautify.png</image>
     </screenshot>
     <screenshot>
       <caption>Smart Redact finds what should not be shared</caption>
-      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.0/docs/screenshots/smart-redact.png</image>
+      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.1/docs/screenshots/smart-redact.png</image>
     </screenshot>
     <screenshot>
       <caption>Recording the screen as MP4, WebM or GIF</caption>
-      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.0/docs/screenshots/record.png</image>
+      <image>https://raw.githubusercontent.com/Romi-iubh/obtura/v0.9.1/docs/screenshots/record.png</image>
     </screenshot>
   </screenshots>
   <provides>
@@ -88,6 +88,21 @@
   </requires>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.9.1" date="2026-11-23">
+      <description>
+        <p>Obtura for Windows, and fixes.</p>
+        <ul>
+          <li>Obtura now also runs on Windows 10 and 11: an installer and a zip to run without
+          installing; Print Screen captures a region from any app, and Obtura's icon by the
+          clock offers the other captures. Everything but screen recording.</li>
+          <li>A mark below a blur, pixelate, box or magnifier shows its new shape at once
+          when it is resized, turned or bent (the saved picture was already right)</li>
+          <li>Windows: in Formatting and Beautify, one click in the colour chooser picks the
+          colour (the first click used to close the panel only)</li>
+          <li>Windows: Obtura no longer stops at start with some graphics drivers</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.9.0" date="2026-11-18">
       <description>
         <p>The first package of Obtura, for Ubuntu 24.04 LTS and newer: the release
